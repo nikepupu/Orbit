@@ -436,6 +436,8 @@ class RobotBase:
 
     def _process_actuators_cfg(self):
         """Process and apply articulation DOF properties."""
+        print('dof names: ', self.articulations.dof_names)
+        
         # sim control mode and dof indices (optimization)
         self.sim_dof_control_modes = {"position": list(), "velocity": list(), "effort": list()}
         # iterate over all actuator configuration
