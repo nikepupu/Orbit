@@ -13,7 +13,7 @@ Reference: https://github.com/ridgeback/ridgeback_manipulation
 """
 
 
-from omni.isaac.orbit.actuators.config.franka import PANDA_HAND_MIMIC_GROUP_CFG
+from omni.isaac.orbit.actuators.config.robotiq import ROBOTIQ3F_LEFT_CFG
 from omni.isaac.orbit.actuators.group import ActuatorControlCfg, ActuatorGroupCfg
 from omni.isaac.orbit.actuators.model import ImplicitActuatorCfg
 from omni.isaac.orbit.utils.assets import ISAAC_NUCLEUS_DIR
@@ -31,7 +31,7 @@ RIDGEBACK_BODY_CFG = MobileManipulatorCfg(
         usd_path=_RIDGEBACK_BODY_USD,
         base_num_dof=3,
         arm_num_dof=6,
-        tool_num_dof=0,
+        tool_num_dof=14,
         tool_sites_names=[
             "left_gripper_finger_1_link_0",
             "left_gripper_finger_1_link_1",
@@ -58,16 +58,6 @@ RIDGEBACK_BODY_CFG = MobileManipulatorCfg(
             "dummy_base_prismatic_y_joint": 0.0,
             "dummy_base_prismatic_x_joint": 0.0,
             "dummy_base_revolute_z_joint": 0.0,
-            #ur5 arm
-            #np.pi / 2, -np.pi / 2, -np.pi / 2, -np.pi / 2, np.pi / 2, 0
-
-            # from universial robot
-            #  "shoulder_pan_joint": 0.0,
-            # "shoulder_lift_joint": -1.712,
-            # "elbow_joint": 1.712,
-            # "wrist_1_joint": 0.0,
-            # "wrist_2_joint": 0.0,
-            # "wrist_3_joint": 0.0,
 
             "left_arm_shoulder_pan_joint": 0,
             "left_arm_shoulder_lift_joint": -1.712,
@@ -76,12 +66,23 @@ RIDGEBACK_BODY_CFG = MobileManipulatorCfg(
             "left_arm_wrist_2_joint": 0.0,
             "left_arm_wrist_3_joint": 0.0,
             #tool
-            "left_gripper*_joint_*": 0.035,
+            
+            "left_gripper_finger_1_joint_1": 0.05,
+            "left_gripper_finger_1_joint_2": 0.0,
+            "left_gripper_finger_1_joint_3": -1.22,
+
+            "left_gripper_finger_2_joint_1": 0.05,
+            "left_gripper_finger_2_joint_2": 0.0,
+            "left_gripper_finger_2_joint_3": -1.22,
+
+            "left_gripper_finger_middle_joint_1": 0.05,
+            "left_gripper_finger_middle_joint_2": 0.0,
+            "left_gripper_finger_middle_joint_3": -1.22,
         },
         dof_vel={".*": 0.0},
     ),
     ee_info=MobileManipulatorCfg.EndEffectorFrameCfg(
-        body_name="left_gripper_palm", pos_offset=(0.0, 0.0, 0.1), rot_offset=(1.0, 0.0, 0.0, 0.0)
+        body_name="left_gripper_tool0", pos_offset=(0.0, 0.0, 0.1), rot_offset=(1.0, 0.0, 0.0, 0.0)
     ),
     actuator_groups={
         "base": ActuatorGroupCfg(
@@ -127,5 +128,6 @@ RIDGEBACK_BODY_CFG = MobileManipulatorCfg(
                                 "left_arm_wrist_2_joint": 0.0, "left_arm_wrist_3_joint": 0.0},
             ),
         ),
+        "lefthand": ROBOTIQ3F_LEFT_CFG
     },
 )

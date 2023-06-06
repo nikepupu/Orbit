@@ -10,6 +10,42 @@ from omni.isaac.orbit.actuators.model import ImplicitActuatorCfg
 Actuator Groups.
 """
 
+ROBOTIQ3F_LEFT_CFG = GripperActuatorGroupCfg(
+    dof_names=[
+            "left_gripper_finger_1_joint_1",
+            "left_gripper_finger_1_joint_2",
+            "left_gripper_finger_1_joint_3",
+
+            "left_gripper_finger_2_joint_1",
+            "left_gripper_finger_2_joint_2",
+            "left_gripper_finger_2_joint_3",
+
+            "left_gripper_finger_middle_joint_1",
+            "left_gripper_finger_middle_joint_2",
+            "left_gripper_finger_middle_joint_3",
+            ],
+
+    model_cfg=ImplicitActuatorCfg(velocity_limit=2.0, torque_limit=1000.0),
+    control_cfg=ActuatorControlCfg(command_types=["v_abs"], stiffness={".*": 1e5}, damping={".*": 1e3}),
+    mimic_multiplier={
+        "left_gripper_finger_1_joint_1": 1.0,  # mimicked joint
+        "left_gripper_finger_1_joint_2": 1.0, 
+        "left_gripper_finger_1_joint_3": 1.0, 
+
+        "left_gripper_finger_2_joint_1": 1.0,  
+        "left_gripper_finger_2_joint_2": 1.0, 
+        "left_gripper_finger_2_joint_3": 1.0, 
+
+        "left_gripper_finger_middle_joint_1": 1.0,
+        "left_gripper_finger_middle_joint_2": 1.0,
+        "left_gripper_finger_middle_joint_3": 1.0
+
+    },
+    speed=0.01,
+    open_dof_pos=0.7,
+    close_dof_pos=0.0,
+)
+
 ROBOTIQ_2F140_MIMIC_GROUP_CFG = GripperActuatorGroupCfg(
     dof_names=["finger_joint", ".*_inner_knuckle_joint", ".*_inner_finger_joint", ".*right_outer_knuckle_joint"],
     model_cfg=ImplicitActuatorCfg(velocity_limit=2.0, torque_limit=1000.0),
