@@ -136,36 +136,36 @@ def main():
             actions[:, -1] = 1
             # print(">>>>>>>> Reset! Opening gripper.")
         # change the gripper action
-        # if ep_step_count % 200 == 0:
-        #     # flip command
-        #     actions[:, -1] = -actions[:, -1]
+        if ep_step_count % 200 == 0:
+            # flip command
+            actions[:, -1] = -actions[:, -1]
         # ==============================================
-        # # change the base action
-        # if ep_step_count == 0:
-        #     actions[:, : robot.base_num_dof] = 0.0
-        #     actions[:, 0] = 1.0
-        # if ep_step_count == 100:
-        #     actions[:, : robot.base_num_dof] = 0.0
-        #     actions[:, 0] = -1.0
+        # change the base action
+        if ep_step_count == 0:
+            actions[:, : robot.base_num_dof] = 0.0
+            actions[:, 0] = 1.0
+        if ep_step_count == 100:
+            actions[:, : robot.base_num_dof] = 0.0
+            actions[:, 0] = -1.0
 
-        # if ep_step_count == 200:
-        #     actions[:, : robot.base_num_dof] = 0.0
-        #     actions[:, 1] = 1.0
+        if ep_step_count == 200:
+            actions[:, : robot.base_num_dof] = 0.0
+            actions[:, 1] = 1.0
 
-        # if ep_step_count == 300:
-        #     actions[:, : robot.base_num_dof] = 0.0
-        #     actions[:, 1] = -1.0
+        if ep_step_count == 300:
+            actions[:, : robot.base_num_dof] = 0.0
+            actions[:, 1] = -1.0
 
-        # if ep_step_count == 400:
-        #     actions[:, : robot.base_num_dof] = 0.0
-        #     actions[:, 2] = 1.0
+        if ep_step_count == 400:
+            actions[:, : robot.base_num_dof] = 0.0
+            actions[:, 2] = 1.0
 
-        # if ep_step_count == 500:
-        #     actions[:, : robot.base_num_dof] = 0.0
-        #     actions[:, 2] = -1.0
+        if ep_step_count == 500:
+            actions[:, : robot.base_num_dof] = 0.0
+            actions[:, 2] = -1.0
         
-        # if ep_step_count == 600:
-        #     ep_step_count = 0
+        if ep_step_count == 600:
+            ep_step_count = 0
         # ==============================================
 
         # if ep_step_count == 200:
@@ -190,11 +190,11 @@ def main():
         #     actions[:, : robot.base_num_dof] = 0.0
         #     actions[:, 2] = 1.0
         # change the arm action
-        # if ep_step_count % 100:
-        #     # print('robot.base_num_dof: ', robot.base_num_dof)
-        #     # print('robot.arm_num_dof: ', robot.arm_num_dof)
-        #     # print('robot.num_actions: ', robot.num_actions)
-        #     actions[:, robot.base_num_dof : ] = torch.rand(robot.count, robot.arm_num_dof, device=robot.device)
+        if ep_step_count % 100:
+            # print('robot.base_num_dof: ', robot.base_num_dof)
+            # print('robot.arm_num_dof: ', robot.arm_num_dof)
+            # print('robot.num_actions: ', robot.num_actions)
+            actions[:, robot.base_num_dof : -1 ] = torch.rand(robot.count, robot.arm_num_dof, device=robot.device)
         # apply action
         # print(actions)
         robot.apply_action(actions)
