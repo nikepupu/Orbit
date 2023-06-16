@@ -20,6 +20,7 @@ from omni.isaac.orbit_envs.isaac_env import IsaacEnv, VecEnvIndices, VecEnvObs
 
 from .drawer_cfg import RandomizationCfg, DrawerEnvCfg
 import numpy as np
+from pxr import UsdGeom
 
 class DrawerEnv(IsaacEnv):
     """Environment for reaching to desired pose for a single-arm manipulator."""
@@ -67,9 +68,25 @@ class DrawerEnv(IsaacEnv):
 
     def _design_scene(self):
         # ground plane
-        kit_utils.create_ground_plane("/World/defaultGroundPlane", z_position=-1.05)
+        kit_utils.create_ground_plane("/World/defaultGroundPlane", z_position=0)
         # table
         prim_utils.create_prim(self.template_env_ns + "/Drawer", usd_path=self.cfg.drawer.usd_path)
+        import omni
+        prim_path = self.template_env_ns + "/Drawer"
+        bboxes = omni.usd.get_context().compute_path_world_bounding_box(prim_path)
+        min_box = np.array(bboxes[0])
+        
+        zmin = min_box[2]
+        from omni.isaac.core.prims import XFormPrim
+        drawer = XFormPrim(prim_path=prim_path)
+        position, orientation = drawer.get_world_pose()
+        
+        position[2] += -zmin 
+        drawer.set_world_pose(position, orientation)
+       
+        # bboxes = prim.ComputeWorldBound(0, UsdGeom.Tokens.default_ )
+        # prim_bboxes = np.array([bboxes.ComputeAlignedRange().GetMin(), bboxes.ComputeAlignedRange().GetMax()])
+     
         # robot
         self.robot.spawn(self.template_env_ns + "/Robot")
 
