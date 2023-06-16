@@ -41,11 +41,13 @@ from omni.isaac.core.simulation_context import SimulationContext
 from omni.isaac.core.utils.viewports import set_camera_view
 
 import omni.isaac.orbit.utils.kit as kit_utils
+from omni.isaac.orbit.robots.config.ridgeback_base import RIDGEBACK_BASE_CFG
 from omni.isaac.orbit.robots.config.ridgeback_franka import RIDGEBACK_FRANKA_PANDA_CFG
 from omni.isaac.orbit.robots.config.ridgeback_dualur5 import RIDGEBACK_DUALARM_UR5_CFG
 from omni.isaac.orbit.robots.config.ridgeback_body import RIDGEBACK_BODY_CFG
-from omni.isaac.orbit.robots.config.ridgeback_base import RIDGEBACK_BASE_CFG
 from omni.isaac.orbit.robots.mobile_manipulator import MobileManipulator
+
+
 
 """
 Helpers

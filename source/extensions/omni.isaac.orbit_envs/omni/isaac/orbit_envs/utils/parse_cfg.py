@@ -36,6 +36,9 @@ def load_default_env_cfg(task_name: str) -> Union[dict, Any]:
         raise ValueError("Please provide a valid task name. Hint: Use --task <task_name>.")
     # retrieve the configuration file to load
     cfg_entry_point: str = gym.spec(task_name)._kwargs.pop("cfg_entry_point")
+    print('cfg_entry_point: ', cfg_entry_point)
+    # from omni.isaac.contrib_envs.gapartnet.drawer import DrawerEnvCfg
+    # print(callable(DrawerEnvCfg))
 
     # parse the default config file
     if cfg_entry_point.endswith(".yaml"):

@@ -1,3 +1,7 @@
+# arnold specific
+*.zip
+usd/
+
 # C++
 **/cmake-build*/
 **/build*/

@@ -92,3 +92,9 @@ gym.register(
     entry_point="omni.isaac.orbit_envs.manipulation.lift:LiftEnv",
     kwargs={"cfg_entry_point": "omni.isaac.orbit_envs.manipulation.lift:LiftEnvCfg"},
 )
+
+gym.register(
+    id="Isaac-Gapartnet-Drawer-v0",
+    entry_point="omni.isaac.orbit_envs.gapartnet.drawer:DrawerEnv",
+    kwargs={"cfg_entry_point": "omni.isaac.orbit_envs.gapartnet.drawer:DrawerEnvCfg"},
+)
