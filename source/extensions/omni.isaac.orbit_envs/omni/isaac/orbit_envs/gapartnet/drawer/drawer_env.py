@@ -88,7 +88,7 @@ class DrawerEnv(IsaacEnv):
         # prim_bboxes = np.array([bboxes.ComputeAlignedRange().GetMin(), bboxes.ComputeAlignedRange().GetMax()])
      
         # robot
-        self.robot.spawn(self.template_env_ns + "/Robot")
+        self.robot.spawn(self.template_env_ns + "/Robot", translation=[3, 0, 0])
 
         # setup debug visualization
         # if self.cfg.viewer.debug_vis and self.enable_render:
@@ -146,11 +146,11 @@ class DrawerEnv(IsaacEnv):
                 self.robot.data.arm_dof_pos,
             )
             # offset actuator command with position offsets
-            self.robot_actions[:, : self.robot.arm_num_dof] -= self.robot.data.actuator_pos_offset[
-                :, : self.robot.arm_num_dof
+            self.robot_actions[:, self.robot.base_num_dof: self.robot.arm_num_dof + self.robot.base_num_dof] -= self.robot.data.actuator_pos_offset[
+                :, self.robot.base_num_dof : self.robot.arm_num_dof + self.robot.base_num_dof
             ]
         elif self.cfg.control.control_type == "default":
-            self.robot_actions[:, : self.robot.arm_num_dof] = self.actions
+            self.robot_actions[:, : self.robot.arm_num_dof+self.robot.base_num_dof + 1] = self.actions
         # perform physics stepping
         for _ in range(self.cfg.control.decimation):
             # set actions into buffers
@@ -230,9 +230,9 @@ class DrawerEnv(IsaacEnv):
             # note: gripper and 3 for planner motion
             self.num_actions = self._ik_controller.num_actions + 4
         elif self.cfg.control.control_type == "default":
-            # note: we exclude gripper from actions in this env
-            self.num_actions = self.robot.arm_num_dof
-
+            # note: gripper and 3 for planner motion
+            self.num_actions = self.robot.arm_num_dof + self.robot.base_num_dof + 1
+        
         # history
         self.actions = torch.zeros((self.num_envs, self.num_actions), device=self.device)
         self.previous_actions = torch.zeros((self.num_envs, self.num_actions), device=self.device)

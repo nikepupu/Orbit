@@ -121,7 +121,7 @@ class DrawerEnvCfg(IsaacEnvCfg):
     """Configuration for the reach environment."""
 
     # General Settings
-    env: EnvCfg = EnvCfg(num_envs=4, env_spacing=10, episode_length_s=5.0)
+    env: EnvCfg = EnvCfg(num_envs=4, env_spacing=10, episode_length_s=20.0)
     viewer: ViewerCfg = ViewerCfg(debug_vis=True, eye=(7.5, 7.5, 7.5), lookat=(0.0, 0.0, 0.0))
     # Physics settings
     sim: SimCfg = SimCfg(dt=1.0 / 60.0, substeps=1)
