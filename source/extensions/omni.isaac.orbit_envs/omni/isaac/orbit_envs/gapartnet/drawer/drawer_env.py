@@ -231,7 +231,7 @@ class DrawerEnv(IsaacEnv):
             self.num_actions = self._ik_controller.num_actions + 4
         elif self.cfg.control.control_type == "default":
             # note: gripper and 3 for planner motion
-            self.num_actions = self.robot.arm_num_dof + self.robot.base_num_dof + 1
+            self.num_actions = self.robot.num_actions#self.robot.arm_num_dof + self.robot.base_num_dof + 1
         
         # history
         self.actions = torch.zeros((self.num_envs, self.num_actions), device=self.device)
@@ -294,16 +294,39 @@ class DrawerObservationManager(ObservationManager):
         )
     
     def base_dof_pos_normalized(self, env: DrawerEnv):
-        """DOF positions for the arm normalized to its max and min ranges."""
+        """DOF positions for the base normalized to its max and min ranges."""
         return scale_transform(
-            env.robot.data.arm_dof_pos,
-            env.robot.data.soft_dof_pos_limits[:, 3, 0],
-            env.robot.data.soft_dof_pos_limits[:, 3, 1],
+            env.robot.data.base_dof_pos,
+            env.robot.data.soft_dof_pos_limits[:, 0:3, 0],
+            env.robot.data.soft_dof_pos_limits[:, 0:3, 1],
         )
+
+    def base_dof_vel(self, env: DrawerEnv):
+        """DOF velocity of the base."""
+        return env.robot.data.base_dof_vel
 
     def arm_dof_vel(self, env: DrawerEnv):
         """DOF velocity of the arm."""
         return env.robot.data.arm_dof_vel
+    
+    def tool_dof_pos_scaled(self, env: DrawerEnv):
+        """DOF positions of the tool normalized to its max and min ranges."""
+        return scale_transform(
+            env.robot.data.tool_dof_pos,
+            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof + env.robot.base_num_dof :, 0],
+            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof + env.robot.base_num_dof :, 1],
+        )
+
+    def tool_positions(self, env: DrawerEnv):
+        """Current end-effector position of the arm."""
+        return env.robot.data.ee_state_w[:, :3] - env.envs_positions
+
+    def tool_orientations(self, env: DrawerEnv):
+        """Current end-effector orientation of the arm."""
+        # make the first element positive
+        quat_w = env.robot.data.ee_state_w[:, 3:7]
+        quat_w[quat_w[:, 0] < 0] *= -1
+        return quat_w
 
     def ee_position(self, env: DrawerEnv):
         """Current end-effector position of the arm."""
