@@ -41,10 +41,11 @@ def main():
     env_cfg = parse_env_cfg(args_cli.task, use_gpu=not args_cli.cpu, num_envs=args_cli.num_envs)
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg, headless=args_cli.headless)
-
+    print('after start')
     # reset environment
     env.reset()
     # simulate environment
+    print('after reset')
     while simulation_app.is_running():
         # compute zero actions
         actions = torch.zeros((env.num_envs, env.action_space.shape[0]), device=env.device)

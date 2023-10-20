@@ -4,13 +4,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from omni.isaac.orbit.controllers.differential_inverse_kinematics import DifferentialInverseKinematicsCfg
-from omni.isaac.orbit.robots.config.ridgeback_body import RIDGEBACK_BODY_CFG
+# from omni.isaac.orbit.robots.config.ridgeback_body import RIDGEBACK_BODY_CFG
+from omni.isaac.orbit.robots.config.mec_kinova_arm_only import KINOVA_CFG
 from omni.isaac.orbit.robots.single_arm import SingleArmManipulatorCfg
 from omni.isaac.orbit.utils import configclass
 from omni.isaac.orbit.utils.assets import ISAAC_NUCLEUS_DIR
+from omni.isaac.orbit.objects.articulated import ArticulatedObjectCfg
 
 from omni.isaac.orbit_envs.isaac_env_cfg import EnvCfg, IsaacEnvCfg, SimCfg, ViewerCfg
-
+from omni.isaac.orbit.objects import RigidObjectCfg
 ##
 # Scene settings
 ##
@@ -21,7 +23,7 @@ class DrawerCfg:
     """Properties for the table."""
 
     # note: we use instanceable asset since it consumes less memory
-    usd_path = f"/home/nikepupu/Orbit/usd/19825/mobility_relabel_gapartnet.usd"
+    usd_path = f"/home/nikepupu/Desktop/Orbit/usd/40147/mobility_relabel_gapartnet.usd"
 
 
 ##
@@ -62,7 +64,7 @@ class ObservationsCfg:
         # global group settings
         enable_corruption: bool = True
         # observation terms
-        base_dof_pos_normalized = {"scale": 1.0, "noise": {"name": "uniform", "min": -0.01, "max": 0.01}}
+        # base_dof_pos_normalized = {"scale": 1.0, "noise": {"name": "uniform", "min": -0.01, "max": 0.01}}
         arm_dof_pos_normalized = {"scale": 1.0, "noise": {"name": "uniform", "min": -0.01, "max": 0.01}}
         tool_dof_pos_scaled = {"scale": 1.0}
         # -- end effector state
@@ -70,10 +72,13 @@ class ObservationsCfg:
         tool_orientations = {"scale": 1.0}
 
         arm_dof_vel = {"scale": 0.5, "noise": {"name": "uniform", "min": -0.1, "max": 0.1}}
-        base_dof_vel = {"scale": 0.5, "noise": {"name": "uniform", "min": -0.1, "max": 0.1}}
+        # base_dof_vel = {"scale": 0.5, "noise": {"name": "uniform", "min": -0.1, "max": 0.1}}
         ee_position = {}
         ee_position_command = {}
         actions = {}
+
+        handle_positions = {"scale": 1.0}
+        # handle_rotations = {"scale": 1.0}
 
     # global observation settings
     return_dict_obs_in_group = False
@@ -86,11 +91,12 @@ class ObservationsCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    tracking_robot_position_l2 = {"weight": 0.0}
-    tracking_robot_position_exp = {"weight": 2.5, "sigma": 0.05}  # 0.25
-    penalizing_robot_dof_velocity_l2 = {"weight": -0.02}  # -1e-4
-    penalizing_robot_dof_acceleration_l2 = {"weight": -1e-5}
-    penalizing_action_rate_l2 = {"weight": -0.1}
+    # tracking_robot_position_l2 = {"weight": 0.0}
+    # tracking_robot_position_exp = {"weight": 2.5, "sigma": 0.05}  # 0.25
+    # penalizing_robot_dof_velocity_l2 = {"weight": -0.02}  # -1e-4
+    # penalizing_robot_dof_acceleration_l2 = {"weight": -1e-5}
+    # penalizing_action_rate_l2 = {"weight": -0.1}
+    custom_reward = {"weight": 1.0}
 
 
 @configclass
@@ -105,7 +111,7 @@ class ControlCfg:
     """Processing of MDP actions."""
 
     # action space
-    control_type = "default"  # "default", "inverse_kinematics"
+    control_type = "inverse_kinematics"  # "default", "inverse_kinematics"
     # decimation: Number of control action updates @ sim dt per policy dt
     decimation = 2
 
@@ -128,13 +134,13 @@ class DrawerEnvCfg(IsaacEnvCfg):
     """Configuration for the reach environment."""
 
     # General Settings
-    env: EnvCfg = EnvCfg(num_envs=4, env_spacing=10, episode_length_s=20.0)
+    env: EnvCfg = EnvCfg(num_envs=4, env_spacing=10, episode_length_s=5.0)
     viewer: ViewerCfg = ViewerCfg(debug_vis=True, eye=(7.5, 7.5, 7.5), lookat=(0.0, 0.0, 0.0))
     # Physics settings
     sim: SimCfg = SimCfg(dt=1.0 / 60.0, substeps=1)
 
     # Scene Settings
-    robot: SingleArmManipulatorCfg = RIDGEBACK_BODY_CFG
+    robot: SingleArmManipulatorCfg = KINOVA_CFG
     drawer: DrawerCfg = DrawerCfg()
 
     # MDP settings

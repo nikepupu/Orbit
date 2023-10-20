@@ -64,6 +64,8 @@ def main():
     # parse configuration
     env_cfg = parse_env_cfg(args_cli.task, use_gpu=not args_cli.cpu, num_envs=args_cli.num_envs)
     agent_cfg = parse_sb3_cfg(args_cli.task)
+
+  
     # override configuration with command line arguments
     if args_cli.seed is not None:
         agent_cfg["seed"] = args_cli.seed

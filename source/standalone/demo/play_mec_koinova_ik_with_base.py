@@ -42,7 +42,7 @@ from omni.isaac.core.utils.viewports import set_camera_view
 
 import omni.isaac.orbit.utils.kit as kit_utils
 from omni.isaac.orbit.robots.config.mec_kinova import MEC_KINOVA_CFG 
-from omni.isaac.orbit.robots.config.mec_kinova_arm_only import KINOVA_CFG
+
 
 from omni.isaac.orbit.robots.mobile_manipulator import MobileManipulator
 from omni.isaac.orbit.robots.single_arm import SingleArmManipulator
@@ -91,7 +91,7 @@ def main():
     # Set main camera
     set_camera_view([1.5, 1.5, 1.5], [0.0, 0.0, 0.0])
     # Spawn things into stage
-    robot_cfg = KINOVA_CFG
+    robot_cfg = MEC_KINOVA_CFG
     # robot_cfg.rigid_props.disable_gravity = True
     robot = SingleArmManipulator(cfg=robot_cfg)
     robot.spawn("/World/envs/env_0/Robot", translation=(0.0, 0.0, 0.0))

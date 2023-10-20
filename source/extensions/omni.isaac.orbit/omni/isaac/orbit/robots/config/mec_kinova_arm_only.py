@@ -18,18 +18,18 @@ from omni.isaac.orbit.actuators.config.robotiq import ROBOTIQ_2F85_MIMIC_GROUP_C
 from omni.isaac.orbit.actuators.group import ActuatorControlCfg, ActuatorGroupCfg
 from omni.isaac.orbit.actuators.model import ImplicitActuatorCfg
 from omni.isaac.orbit.utils.assets import ISAAC_NUCLEUS_DIR
-
+from ..single_arm import SingleArmManipulatorCfg
 from ..mobile_manipulator import MobileManipulatorCfg
 import numpy as np
 
 
-USD_PATH = f"/home/nikepupu/Desktop/mec_kinova_with_base.usd"
+USD_PATH = f"/home/nikepupu/Desktop/mec_kinova.usd"
 
 
-MEC_KINOVA_CFG = MobileManipulatorCfg(
-    meta_info=MobileManipulatorCfg.MetaInfoCfg(
+KINOVA_CFG = SingleArmManipulatorCfg(
+    meta_info=SingleArmManipulatorCfg.MetaInfoCfg(
         usd_path=USD_PATH,
-        base_num_dof=3,
+        # base_num_dof=3,
         arm_num_dof=7,
         tool_num_dof=2,
         tool_sites_names=[
@@ -41,16 +41,12 @@ MEC_KINOVA_CFG = MobileManipulatorCfg(
         ],
     ),
 
-    data_info = MobileManipulatorCfg.DataInfoCfg(
+    data_info = SingleArmManipulatorCfg.DataInfoCfg(
         enable_jacobian=True
     ),
     
-    init_state=MobileManipulatorCfg.InitialStateCfg(
+    init_state=SingleArmManipulatorCfg.InitialStateCfg(
         dof_pos={
-            # base
-            "base_y_base_x": 0.0,
-            "base_theta_base_y": 0.0,
-            "base_link_base_theta": 0.0,
             #arm
             "joint_1": 0.0,
             "joint_2": 0.0,
@@ -69,20 +65,15 @@ MEC_KINOVA_CFG = MobileManipulatorCfg(
         dof_vel={".*": 0.0},
     ),
 
-    ee_info=MobileManipulatorCfg.EndEffectorFrameCfg(
+    ee_info=SingleArmManipulatorCfg.EndEffectorFrameCfg(
         body_name="robotiq_arg2f_base_link", pos_offset=(0.0, 0.0, 0.1034), rot_offset=(1.0, 0.0, 0.0, 0.0)
     ),
 
-    rigid_props=MobileManipulatorCfg.RigidBodyPropertiesCfg(
-        disable_gravity=True,
-    ),
+    # rigid_props=SingleArmManipulatorCfg.RigidBodyPropertiesCfg(
+    #     disable_gravity=True,
+    # ),
     
     actuator_groups={
-        "base": ActuatorGroupCfg(
-            dof_names=["base_y_base_x", "base_theta_base_y", "base_link_base_theta"],
-            model_cfg=ImplicitActuatorCfg(velocity_limit=100.0, torque_limit=1000.0),
-            control_cfg=ActuatorControlCfg(command_types=["v_abs"], stiffness={".*": 0.0}, damping={".*": 1e5}),
-        ),
         "shoulder": ActuatorGroupCfg(
             dof_names=["joint_[1-4]"],
             model_cfg=ImplicitActuatorCfg(velocity_limit=100.0, torque_limit=87.0),

@@ -14,13 +14,24 @@ from omni.isaac.orbit.controllers.differential_inverse_kinematics import Differe
 from omni.isaac.orbit.utils.dict import class_to_dict
 from omni.isaac.orbit.utils.math import random_orientation, sample_uniform, scale_transform
 from omni.isaac.orbit.utils.mdp import ObservationManager, RewardManager
-from omni.isaac.orbit.robots.mobile_manipulator import MobileManipulator
-
+# from omni.isaac.orbit.robots.mobile_manipulator import MobileManipulator
+from omni.isaac.orbit.robots.single_arm import SingleArmManipulator
 from omni.isaac.orbit_envs.isaac_env import IsaacEnv, VecEnvIndices, VecEnvObs
-
+from omni.isaac.orbit.objects.articulated.articulated_object import ArticulatedObject
+from omni.isaac.orbit.objects import RigidObject
 from .drawer_cfg import RandomizationCfg, DrawerEnvCfg
 import numpy as np
 from pxr import UsdGeom
+from pytorch3d.transforms import quaternion_to_matrix
+
+
+
+def quat_axis(q, axis_idx):
+    """Extract a specific axis from a quaternion."""
+    rotm = quaternion_to_matrix(q)
+    axis = rotm[:, axis_idx]
+
+    return axis
 
 class DrawerEnv(IsaacEnv):
     """Environment for reaching to desired pose for a single-arm manipulator."""
@@ -32,7 +43,8 @@ class DrawerEnv(IsaacEnv):
         # note: controller decides the robot control mode
         self._pre_process_cfg()
         # create classes (these are called by the function :meth:`_design_scene`
-        self.robot = MobileManipulator(cfg=self.cfg.robot)
+        self.robot = SingleArmManipulator(cfg=self.cfg.robot)
+        # self.object = RigidObject(cfg=self.cfg.manipulationObject)
 
         # initialize the base class to setup the scene.
         super().__init__(self.cfg, **kwargs)
@@ -88,22 +100,12 @@ class DrawerEnv(IsaacEnv):
         # prim_bboxes = np.array([bboxes.ComputeAlignedRange().GetMin(), bboxes.ComputeAlignedRange().GetMax()])
      
         # robot
-        self.robot.spawn(self.template_env_ns + "/Robot", translation=[3, 0, 0])
+        self.robot.spawn(self.template_env_ns + "/Robot", translation=[-1, 0, 0])
 
-        # setup debug visualization
-        # if self.cfg.viewer.debug_vis and self.enable_render:
-        #     # create point instancer to visualize the goal points
-        #     self._goal_markers = PointMarker("/Visuals/ee_goal", self.num_envs, radius=0.025)
-        #     # create marker for viewing end-effector pose
-        #     self._ee_markers = StaticMarker(
-        #         "/Visuals/ee_current", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
-        #     )
-        #     # create marker for viewing command (if task-space controller is used)
-        #     if self.cfg.control.control_type == "inverse_kinematics":
-        #         self._cmd_markers = StaticMarker(
-        #             "/Visuals/ik_command", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
-        #         )
-        # return list of global prims
+        self.drawer_link_path =  "/link_4"
+        self.drawer_joint_path = "/link_2/joint_1"
+
+        print('done design scene')
         return ["/World/defaultGroundPlane"]
 
     def _reset_idx(self, env_ids: VecEnvIndices):
@@ -137,7 +139,7 @@ class DrawerEnv(IsaacEnv):
         # transform actions based on controller
         if self.cfg.control.control_type == "inverse_kinematics":
             # set the controller commands
-            self._ik_controller.set_command(self.actions)
+            self._ik_controller.set_command(self.actions[:,:-1])
             # compute the joint commands
             self.robot_actions[:, : self.robot.arm_num_dof] = self._ik_controller.compute(
                 self.robot.data.ee_state_w[:, 0:3] - self.envs_positions,
@@ -146,11 +148,12 @@ class DrawerEnv(IsaacEnv):
                 self.robot.data.arm_dof_pos,
             )
             # offset actuator command with position offsets
-            self.robot_actions[:, self.robot.base_num_dof: self.robot.arm_num_dof + self.robot.base_num_dof] -= self.robot.data.actuator_pos_offset[
-                :, self.robot.base_num_dof : self.robot.arm_num_dof + self.robot.base_num_dof
-            ]
+            # self.robot_actions[:, self.robot.arm_num_dof] -= self.robot.data.actuator_pos_offset[
+            #     :, : self.robot.arm_num_dof 
+            # ]
         elif self.cfg.control.control_type == "default":
-            self.robot_actions[:, : self.robot.arm_num_dof+self.robot.base_num_dof + 1] = self.actions
+            # self.robot_actions[:, : self.robot.arm_num_dof+self.robot.base_num_dof + 1] = self.actions
+            self.robot_actions[:, : self.robot.arm_num_dof + 1] = self.actions
         # perform physics stepping
         for _ in range(self.cfg.control.decimation):
             # set actions into buffers
@@ -222,17 +225,16 @@ class DrawerEnv(IsaacEnv):
         # define views over instances
         self.robot.initialize(self.env_ns + "/.*/Robot")
 
+
         # create controller
         if self.cfg.control.control_type == "inverse_kinematics":
             self._ik_controller = DifferentialInverseKinematics(
                 self.cfg.control.inverse_kinematics, self.robot.count, self.device
             )
-            # note: gripper and 3 for planner motion
-            self.num_actions = self._ik_controller.num_actions + 4
+            self.num_actions = self._ik_controller.num_actions + 1
         elif self.cfg.control.control_type == "default":
-            # note: gripper and 3 for planner motion
-            self.num_actions = self.robot.num_actions#self.robot.arm_num_dof + self.robot.base_num_dof + 1
-        
+            self.num_actions = self.robot.num_actions
+
         # history
         self.actions = torch.zeros((self.num_envs, self.num_actions), device=self.device)
         self.previous_actions = torch.zeros((self.num_envs, self.num_actions), device=self.device)
@@ -287,38 +289,80 @@ class DrawerObservationManager(ObservationManager):
 
     def arm_dof_pos_normalized(self, env: DrawerEnv):
         """DOF positions for the arm normalized to its max and min ranges."""
+        # print('arm_dof_pos_normalized: ', scale_transform(
+        #     env.robot.data.arm_dof_pos,
+        #     env.robot.data.soft_dof_pos_limits[:, 3:10, 0],
+        #     env.robot.data.soft_dof_pos_limits[:, 3:10, 1],
+        # ).shape)
         return scale_transform(
             env.robot.data.arm_dof_pos,
-            env.robot.data.soft_dof_pos_limits[:, 3:9, 0],
-            env.robot.data.soft_dof_pos_limits[:, 3:9, 1],
+            env.robot.data.soft_dof_pos_limits[:, 3:10, 0],
+            env.robot.data.soft_dof_pos_limits[:, 3:10, 1],
         )
     
-    def base_dof_pos_normalized(self, env: DrawerEnv):
-        """DOF positions for the base normalized to its max and min ranges."""
-        return scale_transform(
-            env.robot.data.base_dof_pos,
-            env.robot.data.soft_dof_pos_limits[:, 0:3, 0],
-            env.robot.data.soft_dof_pos_limits[:, 0:3, 1],
-        )
+    def handle_positions(self, env: DrawerEnv):
+        import omni
+        stage = omni.usd.get_context().get_stage() 
+        
+        positions = torch.zeros(env.num_envs, 6)
+        for idx in range(env.num_envs):
+            link_path =  f"/World/envs/env_{idx}/Drawer" + env.drawer_link_path 
+            min_box, max_box = omni.usd.get_context().compute_path_world_bounding_box(link_path)
+            
+            min_point = torch.tensor(np.array(min_box))- env.envs_positions[idx].cpu()
+            max_point = torch.tensor(np.array(max_box))- env.envs_positions[idx].cpu()
+            positions[idx] = torch.hstack([min_point, max_point])
+
+           
+
+        # print('rewards: ', rewards)
+        # print('handle_positions: ', positions.shape)
+        return positions.cuda()
+    
+    # def handle_rotations(self, env: DrawerEnv):
+    #     return - env.envs_positions
+    # def base_dof_pos_normalized(self, env: DrawerEnv):
+    #     """DOF positions for the base normalized to its max and min ranges."""
+    #     return scale_transform(
+    #         env.robot.data.base_dof_pos,
+    #         env.robot.data.soft_dof_pos_limits[:, 0:3, 0],
+    #         env.robot.data.soft_dof_pos_limits[:, 0:3, 1],
+    #     )
 
     def base_dof_vel(self, env: DrawerEnv):
         """DOF velocity of the base."""
+        # print('base dof vel: ', env.robot.data.base_dof_vel.shape)
         return env.robot.data.base_dof_vel
 
     def arm_dof_vel(self, env: DrawerEnv):
         """DOF velocity of the arm."""
+
+        # print('arm dof vel: ', env.robot.data.arm_dof_vel.shape)
         return env.robot.data.arm_dof_vel
     
     def tool_dof_pos_scaled(self, env: DrawerEnv):
         """DOF positions of the tool normalized to its max and min ranges."""
+
+        # print('tool_dof_pos_scaled', scale_transform(
+        #     env.robot.data.tool_dof_pos,
+        #     env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 0],
+        #     env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 1],
+        # ).shape)
+
         return scale_transform(
             env.robot.data.tool_dof_pos,
-            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof + env.robot.base_num_dof :, 0],
-            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof + env.robot.base_num_dof :, 1],
+            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 0],
+            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 1],
         )
+        # return scale_transform(
+        #     env.robot.data.tool_dof_pos,
+        #     env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof + env.robot.base_num_dof :, 0],
+        #     env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof + env.robot.base_num_dof :, 1],
+        # )
 
     def tool_positions(self, env: DrawerEnv):
         """Current end-effector position of the arm."""
+        # print('tool_positions: ', (env.robot.data.ee_state_w[:, :3] - env.envs_positions).shape )
         return env.robot.data.ee_state_w[:, :3] - env.envs_positions
 
     def tool_orientations(self, env: DrawerEnv):
@@ -326,43 +370,130 @@ class DrawerObservationManager(ObservationManager):
         # make the first element positive
         quat_w = env.robot.data.ee_state_w[:, 3:7]
         quat_w[quat_w[:, 0] < 0] *= -1
+        # print('tool_orientations: ', quat_w.shape)
         return quat_w
 
     def ee_position(self, env: DrawerEnv):
         """Current end-effector position of the arm."""
+
+        # print('ee_position: ', (env.robot.data.ee_state_w[:, :3] - env.envs_positions).shape )
         return env.robot.data.ee_state_w[:, :3] - env.envs_positions
 
     def ee_position_command(self, env: DrawerEnv):
         """Desired end-effector position of the arm."""
+
+        # print('ee_position_command', (env.ee_des_pose_w[:, :3] - env.envs_positions).shape )
         return env.ee_des_pose_w[:, :3] - env.envs_positions
 
     def actions(self, env: DrawerEnv):
         """Last actions provided to env."""
+        # print('actions: ', env.actions.shape)
         return env.actions
 
 
 class DrawerRewardManager(RewardManager):
     """Reward manager for single-arm reaching environment."""
 
-    def tracking_robot_position_l2(self, env: DrawerEnv):
+    def custom_reward(self, env: DrawerEnv):
         """Penalize tracking position error using L2-kernel."""
-        # compute error
-        return torch.sum(torch.square(env.ee_des_pose_w[:, :3] - env.robot.data.ee_state_w[:, 0:3]), dim=1)
+         # Calculate handle vectors
+        # TODO need to check this
+        import omni
+        rewards = torch.zeros(env.num_envs)
+        for idx in range(env.num_envs):
+            link_path =  f"/World/envs/env_{idx}/Drawer" + env.drawer_link_path 
+            min_box, max_box = omni.usd.get_context().compute_path_world_bounding_box(link_path)
+            
+            min_point = torch.tensor(np.array(min_box)) - env.envs_positions[idx].cpu()
+            max_point = torch.tensor(np.array(max_box)) - env.envs_positions[idx].cpu()
+            handle_long = max_point - min_point
+            handle_long[1] = 0  # Zero-out y and z components to get vector along x-axis
+            handle_short = max_point - min_point
+            handle_short[0] = 0  # Zero-out x and y components to get vector along z-axis (since z is the up direction)
+            handle_out = max_point - min_point
+            handle_out[2] = 0  # Zero-out x and z components to get vector along y-axis
 
-    def tracking_robot_position_exp(self, env: DrawerEnv, sigma: float):
-        """Penalize tracking position error using exp-kernel."""
-        # compute error
-        error = torch.sum(torch.square(env.ee_des_pose_w[:, :3] - env.robot.data.ee_state_w[:, 0:3]), dim=1)
-        return torch.exp(-error / sigma)
+            # print('long: ', handle_long)
+            # print('short: ', handle_short)
+            # print('out: ', handle_out)
+            
+            handle_mid_point = (max_point + min_point) / 2
 
-    def penalizing_robot_dof_velocity_l2(self, env: DrawerEnv):
-        """Penalize large movements of the robot arm."""
-        return torch.sum(torch.square(env.robot.data.arm_dof_vel), dim=1)
+            handle_out_length = torch.norm(handle_out)
+            handle_long_length = torch.norm(handle_long)
+            handle_short_length = torch.norm(handle_short)
 
-    def penalizing_robot_dof_acceleration_l2(self, env: DrawerEnv):
-        """Penalize fast movements of the robot arm."""
-        return torch.sum(torch.square(env.robot.data.dof_acc), dim=1)
+            handle_shortest = torch.min(torch.min(handle_out_length, handle_long_length), handle_short_length)
+            handle_out = handle_out / handle_out_length
+            handle_long = handle_long / handle_long_length
+            handle_short = handle_short / handle_short_length
 
-    def penalizing_action_rate_l2(self, env: DrawerEnv):
-        """Penalize large variations in action commands."""
-        return torch.sum(torch.square(env.actions - env.previous_actions), dim=1)
+            tool_positions = (env.robot.data.ee_state_w[:, :3] - env.envs_positions)[idx].cpu()
+            quat_w = env.robot.data.ee_state_w[:, 3:7]
+            quat_w[quat_w[:, 0] < 0] *= -1
+            tool_orientations = quat_w.cpu()[idx]
+           
+                # reaching
+            tcp_to_obj_delta = tool_positions[:3] - handle_mid_point
+            # print('delta: ', tcp_to_obj_delta)
+            tcp_to_obj_dist = tcp_to_obj_delta.norm()
+            # print('tcp_to_obj_dist: ', tcp_to_obj_dist)
+            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < handle_out_length / 2
+            short_ltip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum() 
+            short_rtip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum()
+            is_reached_short = (short_ltip * short_rtip) < 0
+            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < handle_long_length / 2
+            is_reached = is_reached_out & is_reached_short & is_reached_long
+            reaching_reward = - tcp_to_obj_dist + 0.1 * (is_reached_out + is_reached_short + is_reached_long)
+
+            # # rotation reward
+            hand_rot = tool_orientations
+            hand_grip_dir = quat_axis(hand_rot, 2)
+            hand_grip_dir_length = torch.norm(hand_grip_dir)
+            hand_grip_dir  = hand_grip_dir/ hand_grip_dir_length
+            
+            hand_sep_dir = quat_axis(hand_rot, 1)
+            hand_sep_dir_length = torch.norm(hand_sep_dir)
+            hand_sep_dir = hand_sep_dir / hand_sep_dir_length
+
+            hand_down_dir = quat_axis(hand_rot, 0)
+            hand_down_dir_length = torch.norm(hand_down_dir)
+            hand_down_dir = hand_down_dir / hand_down_dir_length
+
+            
+            dot1 = (-hand_grip_dir * handle_out).sum()
+            dot2 = torch.max((hand_sep_dir * handle_short).sum(), (-hand_sep_dir * handle_short).sum()) 
+            dot3 = torch.max((hand_down_dir * handle_long).sum(), (-hand_down_dir * handle_long).sum())
+
+           
+            rot_reward = dot1 + dot2 + dot3 - 3
+            if rot_reward > 0:
+                print('something wrong: ')
+                print("hand_grip_dir: ", hand_grip_dir)
+                print("handle_out: ", handle_out)
+                print("hand_sep_dir: ", hand_sep_dir)
+                print("handle_short: ", handle_short)
+                print("hand_down_dir: ", hand_down_dir)
+                print("handle_long: ", handle_long)
+            reward = reaching_reward + rot_reward
+            rewards[idx] = reward
+
+        return rewards.cuda()
+
+    # def tracking_robot_position_exp(self, env: DrawerEnv, sigma: float):
+    #     """Penalize tracking position error using exp-kernel."""
+    #     # compute error
+    #     error = torch.sum(torch.square(env.ee_des_pose_w[:, :3] - env.robot.data.ee_state_w[:, 0:3]), dim=1)
+    #     return torch.exp(-error / sigma)
+
+    # def penalizing_robot_dof_velocity_l2(self, env: DrawerEnv):
+    #     """Penalize large movements of the robot arm."""
+    #     return torch.sum(torch.square(env.robot.data.arm_dof_vel), dim=1)
+
+    # def penalizing_robot_dof_acceleration_l2(self, env: DrawerEnv):
+    #     """Penalize fast movements of the robot arm."""
+    #     return torch.sum(torch.square(env.robot.data.dof_acc), dim=1)
+
+    # def penalizing_action_rate_l2(self, env: DrawerEnv):
+    #     """Penalize large variations in action commands."""
+    #     return torch.sum(torch.square(env.actions - env.previous_actions), dim=1)
