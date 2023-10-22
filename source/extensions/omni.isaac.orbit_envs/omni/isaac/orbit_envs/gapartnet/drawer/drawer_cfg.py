@@ -6,6 +6,7 @@
 from omni.isaac.orbit.controllers.differential_inverse_kinematics import DifferentialInverseKinematicsCfg
 # from omni.isaac.orbit.robots.config.ridgeback_body import RIDGEBACK_BODY_CFG
 from omni.isaac.orbit.robots.config.mec_kinova_arm_only import KINOVA_CFG
+from omni.isaac.orbit.robots.config.mec_kinova import MEC_KINOVA_CFG
 from omni.isaac.orbit.robots.single_arm import SingleArmManipulatorCfg
 from omni.isaac.orbit.utils import configclass
 from omni.isaac.orbit.utils.assets import ISAAC_NUCLEUS_DIR
@@ -73,7 +74,7 @@ class ObservationsCfg:
         # global group settings
         enable_corruption: bool = False
         # observation terms
-        # base_dof_pos_normalized = {"scale": 1.0, "noise": {"name": "uniform", "min": -0.01, "max": 0.01}}
+        base_dof_pos_normalized = {"scale": 1.0, "noise": {"name": "uniform", "min": -0.01, "max": 0.01}}
         arm_dof_pos_normalized = {"scale": 1.0, "noise": {"name": "uniform", "min": -0.01, "max": 0.01}}
         tool_dof_pos_scaled = {"scale": 1.0}
         # -- end effector state
@@ -81,9 +82,10 @@ class ObservationsCfg:
         tool_orientations = {"scale": 1.0}
 
         arm_dof_vel = {"scale": 0.5, "noise": {"name": "uniform", "min": -0.1, "max": 0.1}}
-        # base_dof_vel = {"scale": 0.5, "noise": {"name": "uniform", "min": -0.1, "max": 0.1}}
+        base_dof_vel = {"scale": 0.5, "noise": {"name": "uniform", "min": -0.1, "max": 0.1}}
         # ee_position = {}
         # ee_position_command = {}
+        # joints_state = {"scale": 1.0}
         actions = {}
 
         handle_positions = {"scale": 1.0}
@@ -149,7 +151,7 @@ class DrawerEnvCfg(IsaacEnvCfg):
     sim: SimCfg = SimCfg(dt=1.0 / 60.0, substeps=1)
 
     # Scene Settings
-    robot: SingleArmManipulatorCfg = KINOVA_CFG
+    robot: SingleArmManipulatorCfg = MEC_KINOVA_CFG
     drawer: DrawerCfg = DrawerCfg()
 
     marker: MarkerCfg = MarkerCfg()

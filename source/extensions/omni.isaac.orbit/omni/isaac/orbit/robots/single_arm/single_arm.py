@@ -182,6 +182,7 @@ class SingleArmManipulator(RobotBase):
         for body_index, body_name in enumerate(self.body_names):
             if re.fullmatch(self.cfg.ee_info.body_name, body_name):
                 self.ee_body_index = body_index
+        print('self.body_names: ', self.body_names)
         if self.ee_body_index == -1:
             raise ValueError(f"Could not find end-effector body with name: {self.cfg.ee_info.body_name}")
         # -- tool sites

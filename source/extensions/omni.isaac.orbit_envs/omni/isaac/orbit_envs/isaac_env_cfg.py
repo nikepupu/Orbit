@@ -180,7 +180,7 @@ class SimCfg:
         ``replicate_physics`` is set to True.
     """
 
-    use_flatcache: bool = True
+    use_flatcache: bool = False
     """Enable/disable reading of physics buffers directly. Default is True.
 
     When running the simulation, updates in the states in the scene is normally synchronized with USD.

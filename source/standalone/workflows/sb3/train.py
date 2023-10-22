@@ -44,6 +44,7 @@ import os
 from datetime import datetime
 
 from stable_baselines3 import PPO
+from stable_baselines3 import SAC
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import VecNormalize
@@ -109,9 +110,11 @@ def main():
             gamma=agent_cfg["gamma"],
             clip_reward=np.inf,
         )
+    agent_cfg['ent_coef'] = 0.01
 
-    # create agent from stable baselines
     agent = PPO(policy_arch, env, verbose=1, **agent_cfg)
+    # create agent from stable baselines
+    # agent = SAC(policy_arch, env, verbose=1)
     # configure the logger
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
     agent.set_logger(new_logger)

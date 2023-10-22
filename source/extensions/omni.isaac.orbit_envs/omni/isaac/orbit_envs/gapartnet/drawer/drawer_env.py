@@ -6,6 +6,7 @@
 import gym.spaces
 import math
 import torch
+import torch.nn.functional as F
 
 import omni.isaac.core.utils.prims as prim_utils
 
@@ -14,8 +15,8 @@ from omni.isaac.orbit.controllers.differential_inverse_kinematics import Differe
 from omni.isaac.orbit.utils.dict import class_to_dict
 from omni.isaac.orbit.utils.math import random_orientation, sample_uniform, scale_transform
 from omni.isaac.orbit.utils.mdp import ObservationManager, RewardManager
-# from omni.isaac.orbit.robots.mobile_manipulator import MobileManipulator
-from omni.isaac.orbit.robots.single_arm import SingleArmManipulator
+from omni.isaac.orbit.robots.mobile_manipulator import MobileManipulator
+# from omni.isaac.orbit.robots.single_arm import SingleArmManipulator
 from omni.isaac.orbit_envs.isaac_env import IsaacEnv, VecEnvIndices, VecEnvObs
 from omni.isaac.orbit.objects.articulated.articulated_object import ArticulatedObject
 from omni.isaac.orbit.objects import RigidObject
@@ -26,6 +27,7 @@ from pytorch3d.transforms import quaternion_to_matrix
 from omni.isaac.orbit.markers import PointMarker, StaticMarker
 import omni
 from omni.isaac.dynamic_control import _dynamic_control
+from omni.physx.scripts import physicsUtils
 # ./orbit.sh -p source/standalone/workflows/sb3/train.py --task Isaac-Gapartnet-Drawer-v0  --num_envs 6
 
 def quat_axis(q, axis_idx):
@@ -63,7 +65,7 @@ class DrawerEnv(IsaacEnv):
         # note: controller decides the robot control mode
         self._pre_process_cfg()
         # create classes (these are called by the function :meth:`_design_scene`
-        self.robot = SingleArmManipulator(cfg=self.cfg.robot)
+        self.robot = MobileManipulator(cfg=self.cfg.robot)
         # self.object = RigidObject(cfg=self.cfg.manipulationObject)
 
         # initialize the base class to setup the scene.
@@ -101,17 +103,33 @@ class DrawerEnv(IsaacEnv):
     """
 
     def _design_scene(self):
+        import omni
+        from omni.isaac.core.prims import XFormPrim
+
         # ground plane
         kit_utils.create_ground_plane("/World/defaultGroundPlane", z_position=0)
         # table
-        prim_utils.create_prim(self.template_env_ns + "/Drawer", usd_path=self.cfg.drawer.usd_path)
-        import omni
+        prim = prim_utils.create_prim(self.template_env_ns + "/Drawer", usd_path=self.cfg.drawer.usd_path)
+        # apply physics material
+        from pxr import Usd, UsdPhysics, UsdShade, UsdGeom
+        self.stage = omni.usd.get_context().get_stage()
+
+        _physicsMaterialPath = prim.GetPath().AppendChild("physicsMaterial")
+        UsdShade.Material.Define(self.stage, _physicsMaterialPath)
+        material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
+        material.CreateStaticFrictionAttr().Set(1.0)
+        material.CreateDynamicFrictionAttr().Set(1.0)
+        material.CreateRestitutionAttr().Set(1.0)
+
+        physicsUtils.add_physics_material_to_prim(self.stage, prim, _physicsMaterialPath)
+
+        
         prim_path = self.template_env_ns + "/Drawer"
         bboxes = omni.usd.get_context().compute_path_world_bounding_box(prim_path)
         min_box = np.array(bboxes[0])
         
         zmin = min_box[2]
-        from omni.isaac.core.prims import XFormPrim
+        
         drawer = XFormPrim(prim_path=prim_path)
         position, orientation = drawer.get_world_pose()
         
@@ -122,7 +140,7 @@ class DrawerEnv(IsaacEnv):
         # prim_bboxes = np.array([bboxes.ComputeAlignedRange().GetMin(), bboxes.ComputeAlignedRange().GetMax()])
      
         # robot
-        self.robot.spawn(self.template_env_ns + "/Robot", translation=[-1.35, 0.2, 0])
+        self.robot.spawn(self.template_env_ns + "/Robot", translation=[-1.2, 0.2, 0.0])
 
         self._ee_markers = StaticMarker(
                 "/Visuals/ee_current", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
@@ -134,7 +152,7 @@ class DrawerEnv(IsaacEnv):
 
         self.drawer_link_path =  "/link_4"
         self.drawer_joint_path = "/link_2/joint_1"
-        self.stage = omni.usd.get_context().get_stage()
+        
 
         print('done design scene')
         return ["/World/defaultGroundPlane"]
@@ -142,6 +160,11 @@ class DrawerEnv(IsaacEnv):
     def _reset_idx(self, env_ids: VecEnvIndices):
         # randomize the MDP
         # -- robot DOF state
+        # is env do not have _cabinets
+        if not hasattr(self, '_cabinets'):
+            self._cabinets = CabinetView(prim_paths_expr="/World/envs/.*/Drawer", name="cabinet_view")
+            self._cabinets.initialize()
+
         dof_pos, dof_vel = self.robot.get_default_dof_state(env_ids=env_ids)
         self.robot.set_dof_state(dof_pos, dof_vel, env_ids=env_ids)
         # -- desired end-effector pose
@@ -163,8 +186,7 @@ class DrawerEnv(IsaacEnv):
         # controller reset
         if self.cfg.control.control_type == "inverse_kinematics":
             self._ik_controller.reset_idx(env_ids)
-        self._cabinets = CabinetView(prim_paths_expr="/World/envs/.*/Drawer", name="cabinet_view")
-        self._cabinets.initialize()
+        
         # print('cabinets joint: ', self._cabinets.get_joint_positions(clone=False))
         # exit()
         self._cabinets.set_joint_positions(
@@ -214,7 +236,18 @@ class DrawerEnv(IsaacEnv):
         # map the last dimension
         # < 0.5 to -1 and > 0.5 to 1
         # self.actions[:, -1] = -1
-        torch.where(self.actions[:, -1] < 0.5, -1, 1)
+        self.actions[:, -1] = torch.where(self.actions[:, -1] < 0.0, -1, 1)
+        # print('gripper: ', self.actions[:, -1])
+        # action_probs = F.softmax(self.actions[:, -1], dim=0)
+        # print('gripper prob: ', action_probs )
+
+        # chosen_actions = []
+        # for prob in action_probs:
+        #     action = torch.tensor([-1, 1]).numpy()
+        #     chosen_action = torch.multinomial(torch.tensor([prob.item(), 1 - prob.item()]), 1).item()
+        #     chosen_actions.append(chosen_action)
+
+        # self.actions[:, -1] = torch.tensor(chosen_actions)
 
         self._ee_markers.set_world_poses(self.robot.data.ee_state_w[:, 0:3], self.robot.data.ee_state_w[:, 3:7])
 
@@ -373,16 +406,16 @@ class DrawerObservationManager(ObservationManager):
         """DOF positions for the arm normalized to its max and min ranges."""
         # print('arm_dof_pos_normalized: ', scale_transform(
         #     env.robot.data.arm_dof_pos,
-        #     env.robot.data.soft_dof_pos_limits[:, 3:10, 0],
-        #     env.robot.data.soft_dof_pos_limits[:, 3:10, 1],
+        #     env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 0],
+        #     env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 1],
         # ))
         # print('dof pos: ', env.robot.data.arm_dof_pos)
-        # print('dof limit lower: ', env.robot.data.soft_dof_pos_limits[:, 3:10, 0])
-        # print('dof limit upper: ', env.robot.data.soft_dof_pos_limits[:, 3:10, 1])
+        # print('dof limit lower: ', env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 0])
+        # print('dof limit upper: ', env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 1])
         return scale_transform(
             env.robot.data.arm_dof_pos,
-            env.robot.data.soft_dof_pos_limits[:, 3:10, 0],
-            env.robot.data.soft_dof_pos_limits[:, 3:10, 1],
+            env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 0],
+            env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 1],
         )
     
     def handle_positions(self, env: DrawerEnv):
@@ -406,18 +439,20 @@ class DrawerObservationManager(ObservationManager):
     
     # def handle_rotations(self, env: DrawerEnv):
     #     return - env.envs_positions
-    # def base_dof_pos_normalized(self, env: DrawerEnv):
-    #     """DOF positions for the base normalized to its max and min ranges."""
-    #     return scale_transform(
-    #         env.robot.data.base_dof_pos,
-    #         env.robot.data.soft_dof_pos_limits[:, 0:3, 0],
-    #         env.robot.data.soft_dof_pos_limits[:, 0:3, 1],
-    #     )
+    def base_dof_pos_normalized(self, env: DrawerEnv):
+        """DOF positions for the base normalized to its max and min ranges."""
+        # print('base dof pos: ', env.robot.data.base_dof_pos,  env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 0],
+        #        env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 1])
+        return scale_transform(
+            env.robot.data.base_dof_pos,
+            env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 0],
+            env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 1],
+        )
 
-    # def base_dof_vel(self, env: DrawerEnv):
-    #     """DOF velocity of the base."""
-    #     print('base dof vel: ', env.robot.data.base_dof_vel)
-    #     return env.robot.data.base_dof_vel
+    def base_dof_vel(self, env: DrawerEnv):
+        """DOF velocity of the base."""
+        # print('base dof vel: ', env.robot.data.base_dof_vel)
+        return env.robot.data.base_dof_vel
 
     def arm_dof_vel(self, env: DrawerEnv):
         """DOF velocity of the arm."""
@@ -430,14 +465,14 @@ class DrawerObservationManager(ObservationManager):
 
         # print('tool_dof_pos_scaled', scale_transform(
         #     env.robot.data.tool_dof_pos,
-        #     env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 0],
-        #     env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 1],
+        #    env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof+env.robot.arm_num_dof:, 0],
+        #     env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof+env.robot.arm_num_dof:, 1],
         # ))
 
         return scale_transform(
             env.robot.data.tool_dof_pos,
-            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 0],
-            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 1],
+            env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof+env.robot.arm_num_dof:, 0],
+            env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof+env.robot.arm_num_dof:, 1],
         )
         # return scale_transform(
         #     env.robot.data.tool_dof_pos,
@@ -458,6 +493,13 @@ class DrawerObservationManager(ObservationManager):
 
         # print('tool_orientations: ', quat_w)
         return quat_w
+
+    def joints_state(self, env: DrawerEnv):
+        if not hasattr(env, '_cabinets'):
+            env._cabinets = CabinetView(prim_paths_expr="/World/envs/.*/Drawer", name="cabinet_view")
+            env._cabinets.initialize()
+        print('joint state: ', env._cabinets.get_joint_positions(clone=False))
+        return env._cabinets.get_joint_positions(clone=False)
 
     # def ee_position(self, env: DrawerEnv):
     #     """Current end-effector position of the arm."""
@@ -548,7 +590,7 @@ class DrawerRewardManager(RewardManager):
             # print('long(0): ', handle_long)
             # print('short(1): ', handle_short)
             # print('out(2): ', handle_out)
-            handle_out, handle_long = handle_long, handle_out
+            # handle_out, handle_long = handle_long, handle_out
             
             
             handle_mid_point = (max_pt + min_pt) / 2
@@ -580,12 +622,17 @@ class DrawerRewardManager(RewardManager):
             # print('delta: ', tcp_to_obj_delta)
             tcp_to_obj_dist = tcp_to_obj_delta.norm()
             # print('tcp_to_obj_dist: ', tcp_to_obj_dist)
-            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < handle_out_length / 2
+            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < handle_out_length/2 
             short_ltip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum() 
             short_rtip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum()
             is_reached_short = (short_ltip * short_rtip) < 0
-            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < handle_long_length / 2
+            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < handle_long_length/2 
             is_reached = is_reached_out & is_reached_short & is_reached_long
+
+            if is_reached:
+                print('is_reached')
+            # print('reached: ', is_reached_short, is_reached_long, is_reached_out)
+            
             reaching_reward = - tcp_to_obj_dist + 0.1 * (is_reached_out + is_reached_short + is_reached_long)
 
             # # rotation reward
@@ -603,7 +650,7 @@ class DrawerRewardManager(RewardManager):
             hand_down_dir = hand_down_dir / hand_down_dir_length
 
             
-            dot1 = (hand_grip_dir * handle_out).sum()
+            dot1 = (-hand_grip_dir * handle_out).sum()
             dot2 = torch.max((hand_sep_dir * handle_short).sum(), (-hand_sep_dir * handle_short).sum()) 
             dot3 = torch.max((hand_down_dir * handle_long).sum(), (-hand_down_dir * handle_long).sum())
 
@@ -631,31 +678,48 @@ class DrawerRewardManager(RewardManager):
                     Percentage of gripper open state.
                     """
 
-                    O = torch.tensor([[-1.2278e-07, -2.2230e-07, 1.8682e-07, 1.2820e-07, -8.7570e-01, 8.7570e-01]])
-                    C = torch.tensor([[7.2500e-01, 8.7570e-01, -8.7570e-01, -8.7570e-01, 6.9399e-08, -7.0420e-08]])
+                    # O = torch.tensor([[-1.2278e-07, -2.2230e-07, 1.8682e-07, 1.2820e-07, -8.7570e-01, 8.7570e-01]])
+                    # C = torch.tensor([[7.2500e-01, 8.7570e-01, -8.7570e-01, -8.7570e-01, 6.9399e-08, -7.0420e-08]])
+
+                    O = 8.7570e-01#torch.tensor([[-1.2278e-07, -2.2230e-07, 1.8682e-07]])
+                    C = 0#torch.tensor([[7.2500e-01, 8.7570e-01, -8.7570e-01]])
+                    
                     
                     # Clip values in X to be within [C, O]
-                    X = torch.where(X > O, O, X)
-                    X = torch.where(X < C, C, X)
+                    # X = torch.where(X > O, O, X)
+                    # X = torch.where(X < C, C, X)
+                    
+
+                    X = X[-1]
+                    if X < 0:
+                        X = 0
+                    elif X > 0.8757:
+                        X = 0.8757
                     
                     # Compute the normalized differences
                     diffs = (X - C) / (O - C + epsilon)
                     
                     # Check for non-negligible differences between O and C
-                    mask = torch.abs(O - C) > epsilon
+                    # mask = torch.abs(O - C) > epsilon
                     
                     # Calculate average percentage open for the significant elements
-                    percentage = torch.mean(diffs[mask]).item() * 100
+                    percentage = diffs * 100
                     
                     # Ensure the result is between 0 and 100
                     percentage = max(0, min(100, percentage))
                     
                     return percentage/100.0
 
+           
+            gripper_length =  0.08 * gripper_open_percentage(env.robot.data.tool_dof_pos[idx].cpu())
 
-            gripper_length = 0.05 * gripper_open_percentage(env.robot.data.tool_dof_pos[idx].cpu())
+            # close_reward = (0.1 - gripper_length) * is_reached + (gripper_length) * (~is_reached)
 
             close_reward = (0.1 - gripper_length) * is_reached + 0.1*(gripper_length-0.1) * (~is_reached)
+
+           
+
+            # print("reached: ",  is_reached_out, is_reached_short, is_reached_long, is_reached, gripper_open_percentage(env.robot.data.tool_dof_pos[idx].cpu()), close_reward)
 
             grasp_success = is_reached & (gripper_length < handle_short_length + 0.01) & (rot_reward > -0.2)
 
@@ -664,10 +728,12 @@ class DrawerRewardManager(RewardManager):
             
             pos = joint_pos[1]
 
-            joint_state_reward = (pos - env.lower)/(env.upper-env.lower)
+            joint_state_reward =  ((pos - env.lower)/(env.upper-env.lower))
             # if joint_state_reward > 0.05:
             #     print('joint_state_reward: ', joint_state_reward)
-            reward =  reaching_reward + 0.5*rot_reward + 5*close_reward + 5*joint_state_reward 
+            reward =  reaching_reward + 0.5*rot_reward + 10*close_reward + 100*joint_state_reward 
+            if joint_state_reward > 0.9:
+                reward += 100
             rewards[idx] = reward
 
         # self._goal_markers.set_world_poses(env.ee_des_pose_w[:, :3], env.ee_des_pose_w[:, 3:7])
