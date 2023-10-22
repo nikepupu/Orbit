@@ -42,9 +42,9 @@ from omni.isaac.core.utils.viewports import set_camera_view
 
 import omni.isaac.orbit.utils.kit as kit_utils
 from omni.isaac.orbit.robots.config.mec_kinova import MEC_KINOVA_CFG 
-
+from omni.isaac.orbit.robots.config.mec_kinova_arm_only import KINOVA_CFG
 from omni.isaac.orbit.robots.mobile_manipulator import MobileManipulator
-
+from omni.isaac.orbit.robots.single_arm import SingleArmManipulator
 
 
 """
@@ -85,9 +85,9 @@ def main():
     # Set main camera
     set_camera_view([1.5, 1.5, 1.5], [0.0, 0.0, 0.0])
     # Spawn things into stage
-    robot_cfg = MEC_KINOVA_CFG
+    robot_cfg = KINOVA_CFG
     robot_cfg.rigid_props.disable_gravity = True
-    robot = MobileManipulator(cfg=robot_cfg)
+    robot = SingleArmManipulator(cfg=robot_cfg)
     robot.spawn("/World/Robot_1", translation=(0.0, -1.0, 0.0))
     # robot.spawn("/World/Robot_2", translation=(0.0, 1.0, 0.0))
     design_scene()
@@ -104,7 +104,7 @@ def main():
 
     # dummy action
     actions = torch.rand(robot.count, robot.num_actions, device=robot.device)
-    actions[:, 0 : robot.base_num_dof] = 0.0
+    # actions[:, 0 : robot.base_num_dof] = 0.0
     actions[:, -1] = -1
 
     # Define simulation stepping
@@ -132,13 +132,15 @@ def main():
             robot.reset_buffers()
             # reset command
             actions = torch.rand(robot.count, robot.num_actions, device=robot.device)
-            actions[:, 0 : robot.base_num_dof] = 0.0
-            actions[:, -1] = -1
+            # actions[:, 0 : robot.base_num_dof] = 0.0
+            actions[:, -1] = 1
             # print(">>>>>>>> Reset! Opening gripper.")
         # change the gripper action
+        if ep_step_count % 100 == 0:
+            print(' env.robot.data.tool_dof_pos: ', robot.data.tool_dof_pos)
         if ep_step_count % 400 == 0 and ep_step_count  > 0:
             # flip command
-            actions[:, -1] = -actions[:, -1]
+            # actions[:, -1] = -actions[:, -1]
             print('flip gripper')
         # ==============================================
         # change the base action

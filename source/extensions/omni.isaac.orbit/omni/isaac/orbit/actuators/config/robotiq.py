@@ -74,7 +74,28 @@ ROBOTIQ_2F85_MIMIC_GROUP_CFG = GripperActuatorGroupCfg(
     },
     speed=0.01,
     open_dof_pos=0.8,
-    close_dof_pos=0.0,
+    close_dof_pos=0.1,
+)
+
+
+"""Configuration for Robotiq 2F-140 gripper with implicit actuator model."""
+
+CUSTOM_ROBOTIQ_2F85_MIMIC_GROUP_CFG = GripperActuatorGroupCfg(
+    dof_names=["finger_joint", ".*_inner_knuckle_joint", ".*_inner_finger_joint", ".*right_outer_knuckle_joint"],
+    model_cfg=ImplicitActuatorCfg(velocity_limit=2.0, torque_limit=1000.0),
+    control_cfg=ActuatorControlCfg(command_types=["v_abs"], stiffness={".*": 1e5}, damping={".*": 1e3}),
+    mimic_multiplier={
+        "finger_joint": 1.0,  # mimicked joint
+        "left_inner_knuckle_joint": 1.0,
+        "left_inner_finger_joint": 1.0,
+
+        "right_inner_knuckle_joint": -1.0,
+        "right_outer_knuckle_joint": -1.0,
+        "right_inner_finger_joint": -1.0,
+    },
+    speed=0.01,
+    open_dof_pos=0.8,
+    close_dof_pos=0.1,
 )
 """Configuration for Robotiq 2F-85 gripper with implicit actuator model."""
 

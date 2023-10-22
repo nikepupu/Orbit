@@ -13,8 +13,7 @@ Reference: https://github.com/ridgeback/ridgeback_manipulation
 """
 
 
-from omni.isaac.orbit.actuators.config.franka import PANDA_HAND_MIMIC_GROUP_CFG
-from omni.isaac.orbit.actuators.config.robotiq import ROBOTIQ_2F85_MIMIC_GROUP_CFG
+from omni.isaac.orbit.actuators.config.robotiq import CUSTOM_ROBOTIQ_2F85_MIMIC_GROUP_CFG
 from omni.isaac.orbit.actuators.group import ActuatorControlCfg, ActuatorGroupCfg
 from omni.isaac.orbit.actuators.model import ImplicitActuatorCfg
 from omni.isaac.orbit.utils.assets import ISAAC_NUCLEUS_DIR
@@ -23,7 +22,7 @@ from ..mobile_manipulator import MobileManipulatorCfg
 import numpy as np
 
 
-USD_PATH = f"/home/nikepupu/Desktop/mec_kinova.usd"
+USD_PATH = f"/home/nikepupu/Desktop/mec_kinova_flatten.usd"
 
 
 KINOVA_CFG = SingleArmManipulatorCfg(
@@ -33,8 +32,8 @@ KINOVA_CFG = SingleArmManipulatorCfg(
         arm_num_dof=7,
         tool_num_dof=2,
         tool_sites_names=[
-            "right_inner_finger_pad",
-            "left_inner_finger_pad",
+            "right_inner_finger",
+            "left_inner_finger",
             # "_f85_instanceable/robotiq_arg2f_base_link/right_inner_knuckle_joint",
             # "_f85_instanceable/robotiq_arg2f_base_link/left_inner_knuckle_joint",
             # "_f85_instanceable/robotiq_arg2f_base_link/right_outer_knuckle_joint",
@@ -48,13 +47,13 @@ KINOVA_CFG = SingleArmManipulatorCfg(
     init_state=SingleArmManipulatorCfg.InitialStateCfg(
         dof_pos={
             #arm
-            "joint_1": 0.0,
-            "joint_2": 0.0,
-            "joint_3": 0.0,
-            "joint_4": 0.0,
-            "joint_5": 0.0,
-            "joint_6": 0.0,
-            "joint_7": 0.0,
+            "Actuator1": 0.0,
+            "Actuator2": 0.0,
+            "Actuator3": 0.0,
+            "Actuator4": 0.0,
+            "Actuator5": 0.0,
+            "Actuator6": 0.0,
+            "Actuator7": 0.0,
 
             #hand
             "finger_joint": 0.0 , 
@@ -66,7 +65,7 @@ KINOVA_CFG = SingleArmManipulatorCfg(
     ),
 
     ee_info=SingleArmManipulatorCfg.EndEffectorFrameCfg(
-        body_name="robotiq_arg2f_base_link", pos_offset=(0.0, 0.0, 0.1034), rot_offset=(1.0, 0.0, 0.0, 0.0)
+        body_name="robotiq_85_base_link", pos_offset=(0.0, 0.0, 0.0), rot_offset=(1.0, 0.0, 0.0, 0.0)
     ),
 
     # rigid_props=SingleArmManipulatorCfg.RigidBodyPropertiesCfg(
@@ -75,30 +74,30 @@ KINOVA_CFG = SingleArmManipulatorCfg(
     
     actuator_groups={
         "shoulder": ActuatorGroupCfg(
-            dof_names=["joint_[1-4]"],
+            dof_names=["Actuator[1-4]"],
             model_cfg=ImplicitActuatorCfg(velocity_limit=100.0, torque_limit=87.0),
             control_cfg=ActuatorControlCfg(
                 command_types=["p_abs"],
                 stiffness={".*": 800.0},
                 damping={".*": 40.0},
                 dof_pos_offset={
-                    "joint_1": 0.0,
-                    "joint_2": 0.0,
-                    "joint_3": 0.0,
-                    "joint_4": 0.0,
+                    "Actuator1": 0.0,
+                    "Actuator2": 0.0,
+                    "Actuator3": 0.0,
+                    "Actuator4": 0.0,
                 },
             ),
         ),
         "forearm": ActuatorGroupCfg(
-            dof_names=["joint_[5-7]"],
+            dof_names=["Actuator[5-7]"],
             model_cfg=ImplicitActuatorCfg(velocity_limit=100.0, torque_limit=12.0),
             control_cfg=ActuatorControlCfg(
                 command_types=["p_abs"],
                 stiffness={".*": 800.0},
                 damping={".*": 40.0},
-                dof_pos_offset={"joint_5": 0.0, "joint_6": 0, "joint_7": 0},
+                dof_pos_offset={"Actuator5": 0.0, "Actuator6": 0, "Actuator7": 0},
             ),
         ),
-        "hand": ROBOTIQ_2F85_MIMIC_GROUP_CFG
+        "hand": CUSTOM_ROBOTIQ_2F85_MIMIC_GROUP_CFG
     },
 )

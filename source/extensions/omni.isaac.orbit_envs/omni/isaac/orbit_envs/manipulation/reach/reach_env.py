@@ -73,6 +73,7 @@ class ReachEnv(IsaacEnv):
         prim_utils.create_prim(self.template_env_ns + "/Table", usd_path=self.cfg.table.usd_path)
         # robot
         self.robot.spawn(self.template_env_ns + "/Robot")
+        
 
         # setup debug visualization
         if self.cfg.viewer.debug_vis and self.enable_render:

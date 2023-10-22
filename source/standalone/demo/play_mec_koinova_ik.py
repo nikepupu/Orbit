@@ -141,12 +141,12 @@ def main():
 
     # Create buffers to store actions
     ik_commands = torch.zeros(robot.count, ik_controller.num_actions, device=robot.device)
-    robot_actions = torch.ones(robot.count, robot.num_actions, device=robot.device)
+    robot_actions = torch.ones(robot.count, robot.num_actions, device=robot.device) * -1
 
     # Set end effector goals
     # Define goals for the arm
     ee_goals = [
-        [0.3, 0.3, 1.35, 0.7071068, 0.0, 0.0, 0.7071068]
+        [0.2, 0.2, 1.4, 0.7071068,  0.0, 0.7071068, 0.0]
         # [0.5, -0.4, 0.6, 0.707, 0.707, 0.0, 0.0],
         # [0.5, 0, 0.5, 0.0, 1.0, 0.0, 0.0],
     ]
@@ -172,7 +172,7 @@ def main():
             sim.step(render=not args_cli.headless)
             continue
         # reset
-        if count % 500 == 0:
+        if count % 1000 == 0:
             # reset time
             count = 0
             sim_time = 0.0
@@ -203,6 +203,7 @@ def main():
         # # note: valid only when doing position control of the robot
         # robot_actions[:, robot.base_num_dof :  robot.base_num_dof + robot.arm_num_dof] -= arm_command_offset
         # apply actions
+        
         robot.apply_action(robot_actions)
         # perform step
         sim.step(render=not args_cli.headless)

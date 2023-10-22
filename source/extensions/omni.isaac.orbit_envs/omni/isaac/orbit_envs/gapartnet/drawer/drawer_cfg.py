@@ -30,6 +30,15 @@ class DrawerCfg:
 # MDP settings
 ##
 
+@configclass
+class MarkerCfg:
+    """Properties for visualization marker."""
+
+    # usd file to import
+    usd_path = f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd"
+    # scale of the asset at import
+    scale = [0.1, 0.1, 0.1]  # x,y,z
+
 
 @configclass
 class RandomizationCfg:
@@ -62,7 +71,7 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # global group settings
-        enable_corruption: bool = True
+        enable_corruption: bool = False
         # observation terms
         # base_dof_pos_normalized = {"scale": 1.0, "noise": {"name": "uniform", "min": -0.01, "max": 0.01}}
         arm_dof_pos_normalized = {"scale": 1.0, "noise": {"name": "uniform", "min": -0.01, "max": 0.01}}
@@ -73,8 +82,8 @@ class ObservationsCfg:
 
         arm_dof_vel = {"scale": 0.5, "noise": {"name": "uniform", "min": -0.1, "max": 0.1}}
         # base_dof_vel = {"scale": 0.5, "noise": {"name": "uniform", "min": -0.1, "max": 0.1}}
-        ee_position = {}
-        ee_position_command = {}
+        # ee_position = {}
+        # ee_position_command = {}
         actions = {}
 
         handle_positions = {"scale": 1.0}
@@ -111,7 +120,7 @@ class ControlCfg:
     """Processing of MDP actions."""
 
     # action space
-    control_type = "inverse_kinematics"  # "default", "inverse_kinematics"
+    control_type = "default"  # "default", "inverse_kinematics"
     # decimation: Number of control action updates @ sim dt per policy dt
     decimation = 2
 
@@ -142,6 +151,8 @@ class DrawerEnvCfg(IsaacEnvCfg):
     # Scene Settings
     robot: SingleArmManipulatorCfg = KINOVA_CFG
     drawer: DrawerCfg = DrawerCfg()
+
+    marker: MarkerCfg = MarkerCfg()
 
     # MDP settings
     randomization: RandomizationCfg = RandomizationCfg()
