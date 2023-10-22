@@ -122,7 +122,7 @@ class DrawerEnv(IsaacEnv):
         # prim_bboxes = np.array([bboxes.ComputeAlignedRange().GetMin(), bboxes.ComputeAlignedRange().GetMax()])
      
         # robot
-        self.robot.spawn(self.template_env_ns + "/Robot", translation=[-1.35, 0.2, 0])
+        self.robot.spawn(self.template_env_ns + "/Robot", translation=[-1.3, 0.2, 0])
 
         self._ee_markers = StaticMarker(
                 "/Visuals/ee_current", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
@@ -216,7 +216,7 @@ class DrawerEnv(IsaacEnv):
         # self.actions[:, -1] = -1
         torch.where(self.actions[:, -1] < 0.5, -1, 1)
 
-        self._ee_markers.set_world_poses(self.robot.data.ee_state_w[:, 0:3], self.robot.data.ee_state_w[:, 3:7])
+        
 
         # transform actions based on controller
         if self.cfg.control.control_type == "inverse_kinematics":
@@ -260,7 +260,7 @@ class DrawerEnv(IsaacEnv):
         # Note: this is used by algorithms like PPO where time-outs are handled differently
         self.extras["time_outs"] = self.episode_length_buf >= self.max_episode_length
         # -- update USD visualization
-       
+        self._ee_markers.set_world_poses(self.robot.data.ee_state_w[:, 0:3], self.robot.data.ee_state_w[:, 3:7])
 
     def _get_observations(self) -> VecEnvObs:
         # compute observations
