@@ -128,9 +128,9 @@ class DrawerEnv(IsaacEnv):
                 "/Visuals/ee_current", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
             )
 
-        self._goal_markers = StaticMarker(
-                "/Visuals/ee_goal", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
-            )
+        # self._goal_markers = StaticMarker(
+        #         "/Visuals/ee_goal", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
+        #     )
 
         self.drawer_link_path =  "/link_4"
         self.drawer_joint_path = "/link_2/joint_1"
@@ -215,6 +215,8 @@ class DrawerEnv(IsaacEnv):
         # < 0.5 to -1 and > 0.5 to 1
         # self.actions[:, -1] = -1
         torch.where(self.actions[:, -1] < 0.5, -1, 1)
+
+        self._ee_markers.set_world_poses(self.robot.data.ee_state_w[:, 0:3], self.robot.data.ee_state_w[:, 3:7])
 
         # transform actions based on controller
         if self.cfg.control.control_type == "inverse_kinematics":
@@ -508,6 +510,30 @@ class DrawerRewardManager(RewardManager):
             corners[6] = torch.tensor([min_pt[0], max_pt[1], min_pt[2]])
             # Bottom left back
             corners[7] = torch.tensor([max_pt[0], max_pt[1], min_pt[2]])
+            
+            from omni.debugdraw import _debugDraw
+            my_debugDraw = _debugDraw.acquire_debug_draw_interface()
+            
+            def draw_box(maximum, minimum):
+                    import carb
+                    color = 4283782485
+                    # minimum = carb.Float3(origin[0] - extent[0], origin[1] - extent[1], origin[2] - extent[2])
+                    # maximum = carb.Float3(origin[0] + extent[0], origin[1] + extent[1], origin[2] + extent[2])
+                    my_debugDraw.draw_line(carb.Float3(minimum[0], minimum[1], minimum[2]),color, carb.Float3(maximum[0], minimum[1], minimum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(maximum[0], minimum[1], minimum[2]),color, carb.Float3(maximum[0], maximum[1], minimum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(maximum[0], maximum[1], minimum[2]),color, carb.Float3(minimum[0], maximum[1], minimum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(minimum[0], maximum[1], minimum[2]),color, carb.Float3(minimum[0], minimum[1], minimum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(minimum[0], minimum[1], minimum[2]),color, carb.Float3(minimum[0], minimum[1], maximum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(minimum[0], minimum[1], maximum[2]),color, carb.Float3(maximum[0], minimum[1], maximum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(maximum[0], minimum[1], maximum[2]),color, carb.Float3(maximum[0], maximum[1], maximum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(maximum[0], maximum[1], maximum[2]),color, carb.Float3(minimum[0], maximum[1], maximum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(minimum[0], maximum[1], maximum[2]),color, carb.Float3(minimum[0], minimum[1], maximum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(maximum[0], minimum[1], minimum[2]),color, carb.Float3(maximum[0], minimum[1], maximum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(maximum[0], maximum[1], minimum[2]),color, carb.Float3(maximum[0], maximum[1], maximum[2]), color)
+                    my_debugDraw.draw_line(carb.Float3(minimum[0], maximum[1], minimum[2]),color, carb.Float3(minimum[0], maximum[1], maximum[2]), color)
+            
+            
+            # draw_box(max_pt, min_pt)
 
             handle_out = corners[0] - corners[4]
             handle_long = corners[1] - corners[0]
