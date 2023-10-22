@@ -16,7 +16,7 @@ from omni.isaac.orbit.utils.dict import class_to_dict
 from omni.isaac.orbit.utils.math import random_orientation, sample_uniform, scale_transform
 from omni.isaac.orbit.utils.mdp import ObservationManager, RewardManager
 from omni.isaac.orbit.robots.mobile_manipulator import MobileManipulator
-# from omni.isaac.orbit.robots.single_arm import SingleArmManipulator
+from omni.isaac.orbit.robots.single_arm import SingleArmManipulator
 from omni.isaac.orbit_envs.isaac_env import IsaacEnv, VecEnvIndices, VecEnvObs
 from omni.isaac.orbit.objects.articulated.articulated_object import ArticulatedObject
 from omni.isaac.orbit.objects import RigidObject
@@ -65,7 +65,7 @@ class DrawerEnv(IsaacEnv):
         # note: controller decides the robot control mode
         self._pre_process_cfg()
         # create classes (these are called by the function :meth:`_design_scene`
-        self.robot = MobileManipulator(cfg=self.cfg.robot)
+        self.robot = SingleArmManipulator(cfg=self.cfg.robot)
         # self.object = RigidObject(cfg=self.cfg.manipulationObject)
 
         # initialize the base class to setup the scene.
@@ -109,7 +109,7 @@ class DrawerEnv(IsaacEnv):
         # ground plane
         kit_utils.create_ground_plane("/World/defaultGroundPlane", z_position=0)
         # table
-        prim = prim_utils.create_prim(self.template_env_ns + "/Drawer", usd_path=self.cfg.drawer.usd_path)
+        prim = prim_utils.create_prim(self.template_env_ns + "/Drawer", usd_path=self.cfg.drawer.usd_path, scale=[0.9,0.9,0.9])
         # apply physics material
         from pxr import Usd, UsdPhysics, UsdShade, UsdGeom
         self.stage = omni.usd.get_context().get_stage()
@@ -249,7 +249,7 @@ class DrawerEnv(IsaacEnv):
 
         # self.actions[:, -1] = torch.tensor(chosen_actions)
 
-        self._ee_markers.set_world_poses(self.robot.data.ee_state_w[:, 0:3], self.robot.data.ee_state_w[:, 3:7])
+        
 
         # transform actions based on controller
         if self.cfg.control.control_type == "inverse_kinematics":
@@ -293,7 +293,7 @@ class DrawerEnv(IsaacEnv):
         # Note: this is used by algorithms like PPO where time-outs are handled differently
         self.extras["time_outs"] = self.episode_length_buf >= self.max_episode_length
         # -- update USD visualization
-       
+        self._ee_markers.set_world_poses(self.robot.data.ee_state_w[:, 0:3], self.robot.data.ee_state_w[:, 3:7])
 
     def _get_observations(self) -> VecEnvObs:
         # compute observations
@@ -414,8 +414,8 @@ class DrawerObservationManager(ObservationManager):
         # print('dof limit upper: ', env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 1])
         return scale_transform(
             env.robot.data.arm_dof_pos,
-            env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 0],
-            env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 1],
+            env.robot.data.soft_dof_pos_limits[:, 0:env.robot.arm_num_dof, 0],
+            env.robot.data.soft_dof_pos_limits[:, 0:env.robot.arm_num_dof, 1],
         )
     
     def handle_positions(self, env: DrawerEnv):
@@ -439,20 +439,20 @@ class DrawerObservationManager(ObservationManager):
     
     # def handle_rotations(self, env: DrawerEnv):
     #     return - env.envs_positions
-    def base_dof_pos_normalized(self, env: DrawerEnv):
-        """DOF positions for the base normalized to its max and min ranges."""
-        # print('base dof pos: ', env.robot.data.base_dof_pos,  env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 0],
-        #        env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 1])
-        return scale_transform(
-            env.robot.data.base_dof_pos,
-            env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 0],
-            env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 1],
-        )
+    # def base_dof_pos_normalized(self, env: DrawerEnv):
+    #     """DOF positions for the base normalized to its max and min ranges."""
+    #     # print('base dof pos: ', env.robot.data.base_dof_pos,  env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 0],
+    #     #        env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 1])
+    #     return scale_transform(
+    #         env.robot.data.base_dof_pos,
+    #         env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 0],
+    #         env.robot.data.soft_dof_pos_limits[:, 0:env.robot.base_num_dof, 1],
+    #     )
 
-    def base_dof_vel(self, env: DrawerEnv):
-        """DOF velocity of the base."""
-        # print('base dof vel: ', env.robot.data.base_dof_vel)
-        return env.robot.data.base_dof_vel
+    # def base_dof_vel(self, env: DrawerEnv):
+    #     """DOF velocity of the base."""
+    #     # print('base dof vel: ', env.robot.data.base_dof_vel)
+    #     return env.robot.data.base_dof_vel
 
     def arm_dof_vel(self, env: DrawerEnv):
         """DOF velocity of the arm."""
@@ -471,8 +471,8 @@ class DrawerObservationManager(ObservationManager):
 
         return scale_transform(
             env.robot.data.tool_dof_pos,
-            env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof+env.robot.arm_num_dof:, 0],
-            env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof+env.robot.arm_num_dof:, 1],
+            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 0],
+            env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 1],
         )
         # return scale_transform(
         #     env.robot.data.tool_dof_pos,
@@ -498,7 +498,7 @@ class DrawerObservationManager(ObservationManager):
         if not hasattr(env, '_cabinets'):
             env._cabinets = CabinetView(prim_paths_expr="/World/envs/.*/Drawer", name="cabinet_view")
             env._cabinets.initialize()
-        print('joint state: ', env._cabinets.get_joint_positions(clone=False))
+        # print('joint state: ', env._cabinets.get_joint_positions(clone=False))
         return env._cabinets.get_joint_positions(clone=False)
 
     # def ee_position(self, env: DrawerEnv):
