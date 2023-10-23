@@ -73,6 +73,12 @@ MEC_KINOVA_CFG = MobileManipulatorCfg(
     rigid_props=MobileManipulatorCfg.RigidBodyPropertiesCfg(
         disable_gravity=True,
     ),
+
+    physics_material=MobileManipulatorCfg.PhysicsMaterialCfg(
+        static_friction=1.0,
+        dynamic_friction=1.0,
+        restitution=0.0,
+    ),
     
     actuator_groups={
          "base": ActuatorGroupCfg(

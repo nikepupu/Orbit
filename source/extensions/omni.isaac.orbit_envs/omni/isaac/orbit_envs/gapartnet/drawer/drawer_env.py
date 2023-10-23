@@ -699,9 +699,9 @@ class DrawerRewardManager(RewardManager):
             joint_state_reward =  ((pos - env.lower)/(env.upper-env.lower))
             # if joint_state_reward > 0.05:
             #     print('joint_state_reward: ', joint_state_reward)
-            reward =  reaching_reward + 0.5*rot_reward + 10*close_reward + 100*joint_state_reward 
-            # if joint_state_reward > 0.9:
-                # reward += 100
+            reward =  reaching_reward + 0.5*rot_reward + 10*close_reward + grasp_success * 10*joint_state_reward 
+            if joint_state_reward > 0.9:
+                reward += 50
             rewards[idx] = reward
 
         # self._goal_markers.set_world_poses(env.ee_des_pose_w[:, :3], env.ee_des_pose_w[:, 3:7])
