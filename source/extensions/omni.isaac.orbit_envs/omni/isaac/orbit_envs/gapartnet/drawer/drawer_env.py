@@ -30,12 +30,28 @@ from omni.isaac.dynamic_control import _dynamic_control
 from omni.physx.scripts import physicsUtils
 # ./orbit.sh -p source/standalone/workflows/sb3/train.py --task Isaac-Gapartnet-Drawer-v0  --num_envs 6
 
-def quat_axis(q, axis_idx):
-    """Extract a specific axis from a quaternion."""
-    rotm = quaternion_to_matrix(q)
-    axis = rotm[:, axis_idx]
 
-    return axis
+@torch.jit.script
+def quat_rotate(q, v):
+    shape = q.shape
+    q_w = q[:, -1]
+    q_vec = q[:, :3]
+    a = v * (2.0 * q_w ** 2 - 1.0).unsqueeze(-1)
+    b = torch.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
+    c = q_vec * \
+        torch.bmm(q_vec.view(shape[0], 1, 3), v.view(
+            shape[0], 3, 1)).squeeze(-1) * 2.0
+    return a + b + c
+
+def quat_axis(q, axis=0):
+    '''
+    :func apply rotation represented by quanternion `q`
+    on basis vector(along axis)
+    :return vector after rotation
+    '''
+    basis_vec = torch.zeros(q.shape[0], 3, device=q.device)
+    basis_vec[:, axis] = 1
+    return quat_rotate(q, basis_vec)
     
 from typing import Optional
 
@@ -575,6 +591,10 @@ class DrawerRewardManager(RewardManager):
             # print('long(0): ', handle_long)
             # print('short(1): ', handle_short)
             # print('out(2): ', handle_out)
+
+            # print('handle_out_length: ', handle_out_length)
+            # print('handle_long_length: ', handle_long_length)
+            # print('handle_short_length: ', handle_short_length)
 
             # exit()
 
