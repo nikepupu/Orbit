@@ -119,17 +119,6 @@ class DrawerEnv(IsaacEnv):
         # prim = prim_utils.create_prim(self.template_env_ns + "/Drawer", 
         #                               usd_path=self.cfg.drawer.usd_path, scale=self.cfg.drawer.scale )
         # # apply physics material
-        # from pxr import Usd, UsdPhysics, UsdShade, UsdGeom
-        
-
-        # _physicsMaterialPath = prim.GetPath().AppendChild("physicsMaterial")
-        # UsdShade.Material.Define(self.stage, _physicsMaterialPath)
-        # material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
-        # material.CreateStaticFrictionAttr().Set(1.0)
-        # material.CreateDynamicFrictionAttr().Set(1.0)
-        # material.CreateRestitutionAttr().Set(1.0)
-
-        # physicsUtils.add_physics_material_to_prim(self.stage, prim, _physicsMaterialPath)
         
         
        
@@ -139,6 +128,19 @@ class DrawerEnv(IsaacEnv):
         # robot
         self.robot.spawn(self.template_env_ns + "/Robot", translation=[-1.4, 0.2, 0.01])
         self.object.spawn(self.template_env_ns + "/Drawer")
+
+        from pxr import Usd, UsdPhysics, UsdShade, UsdGeom
+        
+        prim = self.stage.GetPrimAtPath(self.template_env_ns + "/Drawer")
+        _physicsMaterialPath = prim.GetPath().AppendChild("physicsMaterial")
+        UsdShade.Material.Define(self.stage, _physicsMaterialPath)
+        material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
+        material.CreateStaticFrictionAttr().Set(1.0)
+        material.CreateDynamicFrictionAttr().Set(1.0)
+        material.CreateRestitutionAttr().Set(1.0)
+
+        physicsUtils.add_physics_material_to_prim(self.stage, prim, _physicsMaterialPath)
+        
 
         
         
