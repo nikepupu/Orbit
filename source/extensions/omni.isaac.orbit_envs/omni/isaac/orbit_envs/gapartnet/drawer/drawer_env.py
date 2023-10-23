@@ -40,7 +40,8 @@ def quat_axis(q, axis_idx):
 from typing import Optional
 
 from omni.isaac.core.articulations import ArticulationView
-from omni.isaac.core.prims import RigidPrimView
+from omni.isaac.core.prims import RigidPrimView, XFormPrim
+
 class CabinetView(ArticulationView):
     def __init__(
         self,
@@ -71,6 +72,7 @@ class DrawerEnv(IsaacEnv):
         self._pre_process_cfg()
         # create classes (these are called by the function :meth:`_design_scene`
         self.robot = MobileManipulator(cfg=self.cfg.robot)
+        self.object = ArticulatedObject(cfg=self.cfg.drawer)
         # self.object = RigidObject(cfg=self.cfg.manipulationObject)
 
         # initialize the base class to setup the scene.
@@ -108,45 +110,47 @@ class DrawerEnv(IsaacEnv):
     """
 
     def _design_scene(self):
-        import omni
-        from omni.isaac.core.prims import XFormPrim
+        
+        self.stage = omni.usd.get_context().get_stage()
 
         # ground plane
         kit_utils.create_ground_plane("/World/defaultGroundPlane", z_position=0)
         # table
-        prim = prim_utils.create_prim(self.template_env_ns + "/Drawer", 
-                                      usd_path=self.cfg.drawer.usd_path, scale=self.cfg.drawer.scale )
-        # apply physics material
-        from pxr import Usd, UsdPhysics, UsdShade, UsdGeom
-        self.stage = omni.usd.get_context().get_stage()
+        # prim = prim_utils.create_prim(self.template_env_ns + "/Drawer", 
+        #                               usd_path=self.cfg.drawer.usd_path, scale=self.cfg.drawer.scale )
+        # # apply physics material
+        # from pxr import Usd, UsdPhysics, UsdShade, UsdGeom
+        
 
-        _physicsMaterialPath = prim.GetPath().AppendChild("physicsMaterial")
-        UsdShade.Material.Define(self.stage, _physicsMaterialPath)
-        material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
-        material.CreateStaticFrictionAttr().Set(1.0)
-        material.CreateDynamicFrictionAttr().Set(1.0)
-        material.CreateRestitutionAttr().Set(1.0)
+        # _physicsMaterialPath = prim.GetPath().AppendChild("physicsMaterial")
+        # UsdShade.Material.Define(self.stage, _physicsMaterialPath)
+        # material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
+        # material.CreateStaticFrictionAttr().Set(1.0)
+        # material.CreateDynamicFrictionAttr().Set(1.0)
+        # material.CreateRestitutionAttr().Set(1.0)
 
-        physicsUtils.add_physics_material_to_prim(self.stage, prim, _physicsMaterialPath)
-
+        # physicsUtils.add_physics_material_to_prim(self.stage, prim, _physicsMaterialPath)
         
-        prim_path = self.template_env_ns + "/Drawer"
-        bboxes = omni.usd.get_context().compute_path_world_bounding_box(prim_path)
-        min_box = np.array(bboxes[0])
         
-        zmin = min_box[2]
-        
-        drawer = XFormPrim(prim_path=prim_path)
-        position, orientation = drawer.get_world_pose()
-        
-        position[2] += -zmin 
-        drawer.set_world_pose(position, orientation)
        
         # bboxes = prim.ComputeWorldBound(0, UsdGeom.Tokens.default_ )
         # prim_bboxes = np.array([bboxes.ComputeAlignedRange().GetMin(), bboxes.ComputeAlignedRange().GetMax()])
      
         # robot
         self.robot.spawn(self.template_env_ns + "/Robot", translation=[-1.4, 0.2, 0.01])
+        self.object.spawn(self.template_env_ns + "/Drawer")
+
+        
+        
+
+        prim_path = self.template_env_ns + "/Drawer"
+        bboxes = omni.usd.get_context().compute_path_world_bounding_box(prim_path)
+        min_box = np.array(bboxes[0])
+        zmin = min_box[2]
+        drawer = XFormPrim(prim_path=prim_path)
+        position, orientation = drawer.get_world_pose()
+        position[2] += -zmin 
+        drawer.set_world_pose(position, orientation)
 
         self._ee_markers = StaticMarker(
                 "/Visuals/ee_current", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
@@ -161,16 +165,17 @@ class DrawerEnv(IsaacEnv):
         
 
         print('done design scene')
+
         return ["/World/defaultGroundPlane"]
 
     def _reset_idx(self, env_ids: VecEnvIndices):
         # randomize the MDP
         # -- robot DOF state
         # is env do not have _cabinets
-        if not hasattr(self, '_cabinets'):
-            self._cabinets = CabinetView(prim_paths_expr="/World/envs/.*/Drawer", name="cabinet_view")
-            self._cabinets.initialize()
-            self._cabinets.post_init()
+        # if not hasattr(self, '_cabinets'):
+        #     self._cabinets = CabinetView(prim_paths_expr="/World/envs/.*/Drawer", name="cabinet_view")
+        #     self._cabinets.initialize()
+        #     self._cabinets.post_init()
 
         dof_pos, dof_vel = self.robot.get_default_dof_state(env_ids=env_ids)
         self.robot.set_dof_state(dof_pos, dof_vel, env_ids=env_ids)
@@ -194,19 +199,9 @@ class DrawerEnv(IsaacEnv):
         if self.cfg.control.control_type == "inverse_kinematics":
             self._ik_controller.reset_idx(env_ids)
         
-        # print('cabinets joint: ', self._cabinets.get_joint_positions(clone=False))
-        # exit()
-        print(self._cabinets.trans, self._cabinets.rot)
-        self._cabinets.set_local_poses(self._cabinets.trans, self._cabinets.rot)
-        # self._cabinets._drawers.set_local_poses(self._cabinets.drawer_trans, self._cabinets.drawer_rot)
-
-        self._cabinets.set_joint_positions(
-            torch.zeros_like(self._cabinets.get_joint_positions(clone=False)[env_ids]), indices=env_ids
-        )
-
-        self._cabinets.set_joint_velocities(
-            torch.zeros_like(self._cabinets.get_joint_velocities(clone=False)[env_ids]), indices=env_ids
-        )
+     
+        dof_pos, dof_vel = self.object.get_default_dof_state(env_ids=env_ids)
+        self.object.set_dof_state(dof_pos, dof_vel, env_ids=env_ids)
 
         
        
@@ -215,31 +210,6 @@ class DrawerEnv(IsaacEnv):
         joint = self.stage.GetPrimAtPath(full_name)
         self.upper = joint.GetAttribute("physics:upperLimit").Get()
         self.lower = joint.GetAttribute("physics:lowerLimit").Get()
-
-        
-        # dc = _dynamic_control.acquire_dynamic_control_interface()
-        # for idx in env_ids:
-        #     full_name =  f"/World/envs/env_{idx}/Drawer" + self.drawer_joint_path 
-            
-        #     joint = self.stage.GetPrimAtPath(full_name)
-        #     joint_type = joint.GetTypeName()
-        #     upper = joint.GetAttribute("physics:upperLimit").Get()
-        #     lower = joint.GetAttribute("physics:lowerLimit").Get()
-        #     art = dc.get_articulation(full_name)
-        #     dof_ptr = dc.find_articulation_dof(art, full_name)
-        #     percentage = 0
-
-        #     tmp = percentage / 100.0 *(upper-lower) + lower
-
-        #     if joint_type == 'PhysicsPrismaticJoint':
-        #         dof_pos = tmp
-        #     else:
-        #         dof_pos = math.radians(tmp)
-
-            
-            
-        #     dc.wake_up_articulation(art)
-        #     dc.set_dof_position(dof_ptr, dof_pos)
            
 
     def _step_impl(self, actions: torch.Tensor):
@@ -353,6 +323,7 @@ class DrawerEnv(IsaacEnv):
 
         # define views over instances
         self.robot.initialize(self.env_ns + "/.*/Robot")
+        self.object.initialize(self.env_ns + "/.*/Drawer")
 
 
         # create controller
@@ -418,19 +389,6 @@ class DrawerObservationManager(ObservationManager):
 
     def arm_dof_pos_normalized(self, env: DrawerEnv):
         """DOF positions for the arm normalized to its max and min ranges."""
-        # print('arm_dof_pos_normalized: ', scale_transform(
-        #     env.robot.data.arm_dof_pos,
-        #     env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 0],
-        #     env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 1],
-        # ))
-        # print('dof pos: ', env.robot.data.arm_dof_pos)
-        # print('dof limit lower: ', env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 0])
-        # print('dof limit upper: ', env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof:env.robot.base_num_dof+env.robot.arm_num_dof, 1])
-        # return scale_transform(
-        #     env.robot.data.arm_dof_pos,
-        #     env.robot.data.soft_dof_pos_limits[:, 0:env.robot.arm_num_dof, 0],
-        #     env.robot.data.soft_dof_pos_limits[:, 0:env.robot.arm_num_dof, 1],
-        # )
 
         return scale_transform(
             env.robot.data.arm_dof_pos,
@@ -483,17 +441,6 @@ class DrawerObservationManager(ObservationManager):
     def tool_dof_pos_scaled(self, env: DrawerEnv):
         """DOF positions of the tool normalized to its max and min ranges."""
 
-        # print('tool_dof_pos_scaled', scale_transform(
-        #     env.robot.data.tool_dof_pos,
-        #    env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof+env.robot.arm_num_dof:, 0],
-        #     env.robot.data.soft_dof_pos_limits[:, env.robot.base_num_dof+env.robot.arm_num_dof:, 1],
-        # ))
-
-        # return scale_transform(
-        #     env.robot.data.tool_dof_pos,
-        #     env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 0],
-        #     env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof:, 1],
-        # )
         return scale_transform(
             env.robot.data.tool_dof_pos,
             env.robot.data.soft_dof_pos_limits[:, env.robot.arm_num_dof + env.robot.base_num_dof :, 0],
@@ -515,12 +462,10 @@ class DrawerObservationManager(ObservationManager):
         return quat_w
 
     def joints_state(self, env: DrawerEnv):
-        if not hasattr(env, '_cabinets'):
-            env._cabinets = CabinetView(prim_paths_expr="/World/envs/.*/Drawer", name="cabinet_view")
-            env._cabinets.initialize()
-            env._cabinets.post_init()
-        # print('joint state: ', env._cabinets.get_joint_positions(clone=False))
-        return env._cabinets.get_joint_positions(clone=False)
+        # print(env.object.data.dof_pos)
+        # return env.object.data.dof_pos
+        # print(env.object.articulations.get_joint_positions(clone=False))
+        return env.object.articulations.get_joint_positions(clone=False)
 
     # def ee_position(self, env: DrawerEnv):
     #     """Current end-effector position of the arm."""
@@ -745,16 +690,16 @@ class DrawerRewardManager(RewardManager):
             grasp_success = is_reached & (gripper_length < handle_short_length + 0.01) & (rot_reward > -0.2)
 
             # how much cabinets opened
-            joint_pos = env._cabinets.get_joint_positions(clone=False)[idx]
+            joint_pos = env.object.articulations.get_joint_positions(clone=False)[idx]
             
             pos = joint_pos[1]
 
             joint_state_reward =  ((pos - env.lower)/(env.upper-env.lower))
             # if joint_state_reward > 0.05:
             #     print('joint_state_reward: ', joint_state_reward)
-            reward =  reaching_reward + 0.5*rot_reward + 10*close_reward + grasp_success * 100*joint_state_reward 
-            if joint_state_reward > 0.9:
-                reward += 100
+            reward =  reaching_reward + 0.5*rot_reward + 10*close_reward + 100*joint_state_reward 
+            # if joint_state_reward > 0.9:
+                # reward += 100
             rewards[idx] = reward
 
         # self._goal_markers.set_world_poses(env.ee_des_pose_w[:, :3], env.ee_des_pose_w[:, 3:7])

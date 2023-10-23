@@ -20,13 +20,17 @@ from omni.isaac.orbit.objects import RigidObjectCfg
 ##
 
 
-@configclass
-class DrawerCfg:
-    """Properties for the table."""
+# @configclass
+# class DrawerCfg(ArticulatedObjectCfg):
+#     """Properties for the table."""
 
-    # note: we use instanceable asset since it consumes less memory
-    usd_path = f"/home/nikepupu/Desktop/Orbit/usd/40147/mobility_relabel_gapartnet.usd"
-    scale = [1.0, 1.0, 1.0]  # x,y,z
+    
+
+#     meta_info=ArticulatedObjectCfg.MetaInfoCfg(
+#         usd_path=f"/home/nikepupu/Desktop/Orbit/usd/40147/mobility_relabel_gapartnet.usd",
+#         # scale=(1.0, 1.0, 1.0), # we need to use instanceable asset since it consumes less memory
+#         # sites_names = []
+#     ),
 
 
 ##
@@ -92,6 +96,7 @@ class ObservationsCfg:
 
         handle_positions = {"scale": 1.0}
         # handle_rotations = {"scale": 1.0}
+        
 
     # global observation settings
     return_dict_obs_in_group = False
@@ -154,7 +159,23 @@ class DrawerEnvCfg(IsaacEnvCfg):
 
     # Scene Settings
     robot: MobileManipulatorCfg = MEC_KINOVA_CFG
-    drawer: DrawerCfg = DrawerCfg()
+    drawer: ArticulatedObjectCfg = ArticulatedObjectCfg(
+        meta_info=ArticulatedObjectCfg.MetaInfoCfg(
+            usd_path=f"/home/nikepupu/Desktop/Orbit/usd/40147/mobility_relabel_gapartnet.usd",
+            scale=(1.0, 1.0, 1.0), # we need to use instanceable asset since it consumes less memory
+            sites_names = []
+        ),
+        
+        init_state=ArticulatedObjectCfg.InitialStateCfg(
+            dof_pos={".*": 0.0},
+            dof_vel={".*": 0.0}, 
+            # rot = [0.5, 0.5, -0.5, -0.5]
+        ),
+
+        
+
+    )
+    
 
     marker: MarkerCfg = MarkerCfg()
 
@@ -165,4 +186,4 @@ class DrawerEnvCfg(IsaacEnvCfg):
     terminations: TerminationsCfg = TerminationsCfg()
 
     # Controller settings
-    control: ControlCfg = ControlCfg()
+    control: ControlCfg = ControlCfg()  
