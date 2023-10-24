@@ -31,27 +31,12 @@ from omni.physx.scripts import physicsUtils
 # ./orbit.sh -p source/standalone/workflows/sb3/train.py --task Isaac-Gapartnet-Drawer-v0  --num_envs 6
 
 
-@torch.jit.script
-def quat_rotate(q, v):
-    shape = q.shape
-    q_w = q[:, -1]
-    q_vec = q[:, :3]
-    a = v * (2.0 * q_w ** 2 - 1.0).unsqueeze(-1)
-    b = torch.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
-    c = q_vec * \
-        torch.bmm(q_vec.view(shape[0], 1, 3), v.view(
-            shape[0], 3, 1)).squeeze(-1) * 2.0
-    return a + b + c
+def quat_axis(q, axis_idx):
+    """Extract a specific axis from a quaternion."""
+    rotm = quaternion_to_matrix(q)
+    axis = rotm[:, axis_idx]
 
-def quat_axis(q, axis=0):
-    '''
-    :func apply rotation represented by quanternion `q`
-    on basis vector(along axis)
-    :return vector after rotation
-    '''
-    basis_vec = torch.zeros(q.shape[0], 3, device=q.device)
-    basis_vec[:, axis] = 1
-    return quat_rotate(q, basis_vec)
+    return axis
     
 from typing import Optional
 
@@ -170,9 +155,9 @@ class DrawerEnv(IsaacEnv):
         position[2] += -zmin 
         drawer.set_world_pose(position, orientation)
 
-        self._ee_markers = StaticMarker(
-                "/Visuals/ee_current", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
-            )
+        # self._ee_markers = StaticMarker(
+        #         "/Visuals/ee_current", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
+        #     )
 
         # self._goal_markers = StaticMarker(
         #         "/Visuals/ee_goal", self.num_envs, usd_path=self.cfg.marker.usd_path, scale=self.cfg.marker.scale
@@ -295,7 +280,7 @@ class DrawerEnv(IsaacEnv):
         # Note: this is used by algorithms like PPO where time-outs are handled differently
         self.extras["time_outs"] = self.episode_length_buf >= self.max_episode_length
         # -- update USD visualization
-        self._ee_markers.set_world_poses(self.robot.data.ee_state_w[:, 0:3], self.robot.data.ee_state_w[:, 3:7])
+        # self._ee_markers.set_world_poses(self.robot.data.ee_state_w[:, 0:3], self.robot.data.ee_state_w[:, 3:7])
 
     def _get_observations(self) -> VecEnvObs:
         # compute observations
@@ -418,20 +403,70 @@ class DrawerObservationManager(ObservationManager):
         import omni
         stage = omni.usd.get_context().get_stage() 
         
-        positions = torch.zeros(env.num_envs, 3)
+        state = torch.zeros(env.num_envs, 57)
         for idx in range(env.num_envs):
+
+            
+
             link_path =  f"/World/envs/env_{idx}/Drawer" + env.drawer_link_path 
             min_box, max_box = omni.usd.get_context().compute_path_world_bounding_box(link_path)
             
-            min_point = torch.tensor(np.array(min_box))- env.envs_positions[idx].cpu()
-            max_point = torch.tensor(np.array(max_box))- env.envs_positions[idx].cpu()
-            positions[idx] = (min_point +  max_point)/2.0
+            min_pt = torch.tensor(np.array(min_box))- env.envs_positions[idx].cpu()
+            max_pt = torch.tensor(np.array(max_box))- env.envs_positions[idx].cpu()
+            center1 = (min_pt +  max_pt)/2.0
+            tool_pos_diff = (env.robot.data.ee_state_w[:, :3] - env.envs_positions)[idx].cpu() - center1
+            # positions[idx] = (min_point +  max_point)/2.0
+            corners = torch.zeros((8, 3))
+            # Top right back
+            corners[0] = torch.tensor([max_pt[0], min_pt[1], max_pt[2]])
+            # Top right front
+            corners[1] = torch.tensor([min_pt[0], min_pt[1], max_pt[2]])
+            # Top left front
+            corners[2] = torch.tensor([min_pt[0], max_pt[1], max_pt[2]])
+            # Top left back (Maximum)
+            corners[3] = max_pt
+            # Bottom right back
+            corners[4] = torch.tensor([max_pt[0], min_pt[1], min_pt[2]])
+            # Bottom right front (Minimum)
+            corners[5] = min_pt
+            # Bottom left front
+            corners[6] = torch.tensor([min_pt[0], max_pt[1], min_pt[2]])
+            # Bottom left back
+            corners[7] = torch.tensor([max_pt[0], max_pt[1], min_pt[2]])
+
+            BigCorners = torch.zeros((8, 3))
+            link_path =  f"/World/envs/env_{idx}/Drawer"
+            min_box, max_box = omni.usd.get_context().compute_path_world_bounding_box(link_path)
+
+            min_pt = torch.tensor(np.array(min_box))- env.envs_positions[idx].cpu()
+            max_pt = torch.tensor(np.array(max_box))- env.envs_positions[idx].cpu()
+            center2 = (min_pt +  max_pt)/2.0
+            # positions[idx] = (min_point +  max_point)/2.0
+            corners = torch.zeros((8, 3))
+            # Top right back
+            BigCorners[0] = torch.tensor([max_pt[0], min_pt[1], max_pt[2]])
+            # Top right front
+            BigCorners[1] = torch.tensor([min_pt[0], min_pt[1], max_pt[2]])
+            # Top left front
+            BigCorners[2] = torch.tensor([min_pt[0], max_pt[1], max_pt[2]])
+            # Top left back (Maximum)
+            BigCorners[3] = max_pt
+            # Bottom right back
+            BigCorners[4] = torch.tensor([max_pt[0], min_pt[1], min_pt[2]])
+            # Bottom right front (Minimum)
+            BigCorners[5] = min_pt
+            # Bottom left front
+            BigCorners[6] = torch.tensor([min_pt[0], max_pt[1], min_pt[2]])
+            # Bottom left back
+            BigCorners[7] = torch.tensor([max_pt[0], max_pt[1], min_pt[2]])
+            
+            state[idx] = torch.cat(( torch.flatten(corners), torch.flatten(BigCorners), center1, center2, tool_pos_diff ) )
 
            
 
         # print('rewards: ', rewards)
         # print('handle_positions: ', positions)
-        return positions.cuda()
+        return state.cuda()
     
     # def handle_rotations(self, env: DrawerEnv):
     #     return - env.envs_positions
@@ -561,9 +596,15 @@ class DrawerRewardManager(RewardManager):
             
             # draw_box(max_pt, min_pt)
 
-            handle_out = corners[0] - corners[4]
-            handle_long = corners[1] - corners[0]
-            handle_short = corners[3] - corners[0]
+            # handle_out = corners[0] - corners[4]
+            # handle_long = corners[1] - corners[0]
+            # handle_short = corners[3] - corners[0]
+
+            handle_short = corners[0] - corners[4]
+            handle_out = corners[1] - corners[0]
+            handle_long = corners[3] - corners[0]
+
+            handle_short, handle_long = handle_long, handle_short
 
             # print('long(0): ', handle_long)
             # print('short(1): ', handle_short)
@@ -600,9 +641,9 @@ class DrawerRewardManager(RewardManager):
 
             tool_positions = (env.robot.data.ee_state_w[:, :3] - env.envs_positions)[idx].cpu()
             quat_w = env.robot.data.ee_state_w[:, 3:7]
-            quat_w[quat_w[:, 0] < 0] *= -1
+            # quat_w[quat_w[:, 0] < 0] *= -1
              # change quarternion order from W, X, Y, Z to X, Y, Z, W
-            quat_w = quat_w[:, [1, 2, 3, 0]]
+            # quat_w = quat_w[:, [1, 2, 3, 0]]
             tool_orientations = quat_w.cpu()[idx]
            
                 # reaching
@@ -610,15 +651,17 @@ class DrawerRewardManager(RewardManager):
             # print('delta: ', tcp_to_obj_delta)
             tcp_to_obj_dist = tcp_to_obj_delta.norm()
             # print('tcp_to_obj_dist: ', tcp_to_obj_dist)
-            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < handle_out_length/2 
-            short_ltip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum() 
-            short_rtip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum()
-            is_reached_short = (short_ltip * short_rtip) < 0
-            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < handle_long_length/2 
+            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < (handle_out_length/2 )
+            # short_ltip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum() 
+            # short_rtip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum()
+            # is_reached_short = (short_ltip * short_rtip) < 0
+            is_reached_short = (tcp_to_obj_delta * handle_short).sum().abs() < (handle_short_length/2)
+            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < (handle_long_length/2) 
             is_reached = is_reached_out & is_reached_short & is_reached_long
 
             if is_reached:
-                print('is_reached')
+                print('reached ')
+          
             # print('reached: ', is_reached_short, is_reached_long, is_reached_out)
             
             reaching_reward = - tcp_to_obj_dist + 0.1 * (is_reached_out + is_reached_short + is_reached_long)
@@ -638,7 +681,7 @@ class DrawerRewardManager(RewardManager):
             hand_down_dir = hand_down_dir / hand_down_dir_length
 
             
-            dot1 = (-hand_grip_dir * handle_out).sum()
+            dot1 = (hand_grip_dir * handle_out).sum()
             dot2 = torch.max((hand_sep_dir * handle_short).sum(), (-hand_sep_dir * handle_short).sum()) 
             dot3 = torch.max((hand_down_dir * handle_long).sum(), (-hand_down_dir * handle_long).sum())
 
@@ -703,13 +746,15 @@ class DrawerRewardManager(RewardManager):
 
             # close_reward = (0.1 - gripper_length) * is_reached + (gripper_length) * (~is_reached)
 
-            close_reward = (0.1 - gripper_length) * is_reached + 0.1*(gripper_length-0.1) * (~is_reached)
+            close_reward = (0.05 - gripper_length) * is_reached + (gripper_length-0.1) * (~is_reached)
 
            
 
             # print("reached: ",  is_reached_out, is_reached_short, is_reached_long, is_reached, gripper_open_percentage(env.robot.data.tool_dof_pos[idx].cpu()), close_reward)
-
-            grasp_success = is_reached & (gripper_length < handle_short_length + 0.01) & (rot_reward > -0.2)
+            grasp_success = is_reached & (rot_reward > -0.2) & (gripper_length < 0.07)
+            if grasp_success:
+                print(grasp_success)
+            # grasp_success = is_reached & (gripper_length < handle_short_length + 0.01) & (rot_reward > -0.2)
 
             # how much cabinets opened
             joint_pos = env.object.articulations.get_joint_positions(clone=False)[idx]

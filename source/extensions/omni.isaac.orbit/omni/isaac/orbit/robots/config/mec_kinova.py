@@ -83,13 +83,13 @@ MEC_KINOVA_CFG = MobileManipulatorCfg(
     actuator_groups={
          "base": ActuatorGroupCfg(
             dof_names=["base_y_base_x", "base_theta_base_y", "base_link_base_theta"],
-            model_cfg=ImplicitActuatorCfg(velocity_limit=100.0, torque_limit=1000.0),
+            model_cfg=ImplicitActuatorCfg(velocity_limit=500.0, torque_limit=1000.0),
             control_cfg=ActuatorControlCfg(command_types=["v_abs"], stiffness={".*": 0.0}, damping={".*": 1e5}),
         ),
 
         "shoulder": ActuatorGroupCfg(
             dof_names=["Actuator[1-4]"],
-            model_cfg=ImplicitActuatorCfg(velocity_limit=100.0, torque_limit=87.0),
+            model_cfg=ImplicitActuatorCfg(velocity_limit=500.0, torque_limit=1000.0),
             control_cfg=ActuatorControlCfg(
                 command_types=["p_abs"],
                 stiffness={".*": 800.0},
@@ -104,7 +104,7 @@ MEC_KINOVA_CFG = MobileManipulatorCfg(
         ),
         "forearm": ActuatorGroupCfg(
             dof_names=["Actuator[5-7]"],
-            model_cfg=ImplicitActuatorCfg(velocity_limit=100.0, torque_limit=12.0),
+            model_cfg=ImplicitActuatorCfg(velocity_limit=500.0, torque_limit=1000.0),
             control_cfg=ActuatorControlCfg(
                 command_types=["p_abs"],
                 stiffness={".*": 800.0},
