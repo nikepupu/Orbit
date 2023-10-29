@@ -130,15 +130,30 @@ class DrawerEnv(IsaacEnv):
         self.robot.spawn(self.template_env_ns + "/Robot", translation=[-1.4, 0.2, 0.01])
         self.object.spawn(self.template_env_ns + "/Drawer")
 
-        from pxr import Usd, UsdPhysics, UsdShade, UsdGeom
-        
+        from pxr import Usd, UsdPhysics, UsdShade, UsdGeom, PhysxSchema
+        from omni.isaac.core.materials import PhysicsMaterial
         prim = self.stage.GetPrimAtPath(self.template_env_ns + "/Drawer")
         _physicsMaterialPath = prim.GetPath().AppendChild("physicsMaterial")
-        UsdShade.Material.Define(self.stage, _physicsMaterialPath)
-        material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
-        material.CreateStaticFrictionAttr().Set(1.0)
-        material.CreateDynamicFrictionAttr().Set(1.0)
-        material.CreateRestitutionAttr().Set(1.0)
+        # UsdShade.Material.Define(self.stage, _physicsMaterialPath)
+        # material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
+        # material.CreateStaticFrictionAttr().Set(1.0)
+        # material.CreateDynamicFrictionAttr().Set(1.0)
+        # material.CreateRestitutionAttr().Set(1.0)
+
+
+
+        material = PhysicsMaterial(
+                prim_path=_physicsMaterialPath,
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=0.0,
+            )
+        # -- enable patch-friction: yields better results!
+        physx_material_api = PhysxSchema.PhysxMaterialAPI.Apply(material.prim)
+        physx_material_api.CreateImprovePatchFrictionAttr().Set(True)
+        # -- bind material to feet
+        # for site_name in self.cfg.meta_info.tool_sites_names:
+        #     kit_utils.apply_nested_physics_material(f"{prim_path}/{site_name}", material.prim_path)
 
         physicsUtils.add_physics_material_to_prim(self.stage, prim, _physicsMaterialPath)
         

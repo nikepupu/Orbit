@@ -34,6 +34,8 @@ KINOVA_CFG = SingleArmManipulatorCfg(
         tool_sites_names=[
             "right_inner_finger",
             "left_inner_finger",
+            # 'right_inner_finger_pad',
+            # 'left_inner_finger_pad'
             # "_f85_instanceable/robotiq_arg2f_base_link/right_inner_knuckle_joint",
             # "_f85_instanceable/robotiq_arg2f_base_link/left_inner_knuckle_joint",
             # "_f85_instanceable/robotiq_arg2f_base_link/right_outer_knuckle_joint",
@@ -42,6 +44,15 @@ KINOVA_CFG = SingleArmManipulatorCfg(
 
     data_info = SingleArmManipulatorCfg.DataInfoCfg(
         enable_jacobian=True
+    ),
+
+    collision_props=SingleArmManipulatorCfg.CollisionPropertiesCfg(
+        contact_offset=0.005,
+        rest_offset=0.0,
+    ),
+
+    articulation_props=SingleArmManipulatorCfg.ArticulationRootPropertiesCfg(
+        enable_self_collisions=True,
     ),
     
     init_state=SingleArmManipulatorCfg.InitialStateCfg(
@@ -65,7 +76,7 @@ KINOVA_CFG = SingleArmManipulatorCfg(
     ),
 
     ee_info=SingleArmManipulatorCfg.EndEffectorFrameCfg(
-        body_name="robotiq_85_base_link", pos_offset=(0.0, 0.0, 0.149), rot_offset=(1.0, 0.0, 0.0, 0.0)
+        body_name="robotiq_85_base_link", pos_offset=(0.03, 0.0, 0.15), rot_offset=(1.0, 0.0, 0.0, 0.0)
     ),
 
     # rigid_props=SingleArmManipulatorCfg.RigidBodyPropertiesCfg(

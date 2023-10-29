@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+
+############################################ this is used for isaac sim 2023, however, instanceable is still not working with sapien dataset
 """
 Utility to convert a URDF into USD format.
 
@@ -71,7 +73,6 @@ import omni.isaac.core.utils.stage as stage_utils
 import omni.kit.commands
 from omni.isaac.core.simulation_context import SimulationContext
 
-from omni.isaac.orbit.utils.assets import check_file_path
 
 _DRIVE_TYPE = {
     "none": 0,
@@ -92,6 +93,28 @@ _NORMALS_DIVISION = {
 def main():
     # check valid file path
     # urdf_path = args_cli.input
+    from omni.importer.urdf import _urdf
+    urdf_interface = _urdf.acquire_urdf_interface()
+    import_config = _urdf.ImportConfig()
+    import_config.merge_fixed_joints = False
+    import_config.convex_decomp = False
+    import_config.import_inertia_tensor = True
+    import_config.fix_base = True
+    import_config.make_default_prim = True
+    import_config.self_collision = False
+    import_config.create_physics_scene = False
+    import_config.import_inertia_tensor = False
+    import_config.default_drive_strength = 1000
+    import_config.default_position_drive_damping = 1.0
+    import_config.default_drive_type = _urdf.UrdfJointTargetType.JOINT_DRIVE_NONE
+    import_config.distance_scale = 1
+    import_config.density = 0.0
+    import_config.set_make_instanceable(True)
+    
+    # urdf_config.set_make_default_prim(True)
+    #     # -- instancing settings
+    #     urdf_config.set_make_instanceable(False)
+
     directory = "/mnt/data/GAPartNet_PartNetMobility_COACD/partnet_all_annotated_new/annotation"
     directory = "/home/nikepupu/Desktop/GAPartNet_1025/partnet_all_annotated_new/annotation"
     items = os.listdir(directory)
@@ -116,32 +139,6 @@ def main():
     for idx,(urdf_path, folder_path, usd_path) in enumerate(zip(full_paths,full_folder_paths, usd_paths)):
         print("idx: ", idx, f"out of {len(usd_paths)}")
         # Import URDF config
-        _, urdf_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        folder_name = folder_path.split('/')[-1]
-        # Set URDF config
-        # -- stage settings -- dont need to change these.
-        urdf_config.set_distance_scale(1.0)
-        urdf_config.set_up_vector(0, 0, 1)
-        urdf_config.set_create_physics_scene(False)
-        urdf_config.set_make_default_prim(True)
-        # -- instancing settings
-        urdf_config.set_make_instanceable(False)
-        urdf_config.set_instanceable_usd_path(f"instanceable/{folder_name}/usd/instanceable_meshes.usd")
-        # -- asset settings
-        urdf_config.set_density(0.0)
-        urdf_config.set_import_inertia_tensor(True)
-        urdf_config.set_convex_decomp(False)
-        urdf_config.set_subdivision_scheme(_NORMALS_DIVISION["bilinear"])
-        # -- physics settings
-        urdf_config.set_fix_base(True)
-        urdf_config.set_self_collision(False)
-        urdf_config.set_merge_fixed_joints(args_cli.merge_joints)
-        # -- drive settings
-        # note: we set these to none because we want to use the default drive settings.
-        urdf_config.set_default_drive_type(_DRIVE_TYPE["none"])
-        # urdf_config.set_default_drive_strength(1e7)
-        # urdf_config.set_default_position_drive_damping(1e5)
 
         # Print info
         print("-" * 80)
@@ -149,25 +146,27 @@ def main():
         print(f"Input URDF file: {urdf_path}")
         print(f"Saving USD file: {usd_path}")
         print("URDF importer config:")
-        for key in dir(urdf_config):
-            if not key.startswith("__"):
-                try:
-                    # get attribute
-                    attr = getattr(urdf_config, key)
-                    # check if attribute is a function
-                    if callable(attr):
-                        continue
-                    # print attribute
-                    print(f"\t{key}: {attr}")
-                except TypeError:
-                    # this is only the case for subdivison scheme
-                    pass
+        folder_name = folder_path.split('/')[-1]
+        import_config.set_instanceable_usd_path(f"instanceable/{folder_name}/usd/instanceable_meshes.usd")
+        # for key in dir(urdf_config):
+        #     if not key.startswith("__"):
+        #         try:
+        #             # get attribute
+        #             attr = getattr(urdf_config, key)
+        #             # check if attribute is a function
+        #             if callable(attr):
+        #                 continue
+        #             # print attribute
+        #             print(f"\t{key}: {attr}")
+        #         except TypeError:
+        #             # this is only the case for subdivison scheme
+        #             pass
         print("-" * 80)
         print("-" * 80)
 
         # Import URDF file
         omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=urdf_config, dest_path=usd_path
+            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config, dest_path=usd_path
         )
 
     # # Simulate scene (if not headless)

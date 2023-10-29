@@ -81,22 +81,42 @@ def design_scene():
     prim_utils.create_prim(f"/World/Drawer", usd_path="/home/nikepupu/Desktop/Orbit/usd/40147/mobility_relabel_gapartnet.usd",
                             translation=[0,0,0.6])
     
-    from pxr import Usd, UsdPhysics, UsdShade, UsdGeom
+    from pxr import Usd, UsdPhysics, UsdShade, UsdGeom, PhysxSchema
+    from omni.isaac.core.materials import PhysicsMaterial
     stage = omni.usd.get_context().get_stage()
 
     prim = stage.GetPrimAtPath("/World/Drawer")
     _physicsMaterialPath = prim.GetPath().AppendChild("physicsMaterial")
-    
-    UsdShade.Material.Define(stage, _physicsMaterialPath)
-    material = UsdPhysics.MaterialAPI.Apply(stage.GetPrimAtPath(_physicsMaterialPath))
-    material.CreateStaticFrictionAttr().Set(1.0)
-    material.CreateDynamicFrictionAttr().Set(1.0)
-    material.CreateRestitutionAttr().Set(0.0)
+    # UsdShade.Material.Define(self.stage, _physicsMaterialPath)
+    # material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
+    # material.CreateStaticFrictionAttr().Set(1.0)
+    # material.CreateDynamicFrictionAttr().Set(1.0)
+    # material.CreateRestitutionAttr().Set(1.0)
 
-    physicsUtils.add_physics_material_to_prim(stage, prim, _physicsMaterialPath)
-    # bindingAPI = UsdShade.MaterialBindingAPI.Apply(prim)
-    # materialPrim = UsdShade.Material(stage.GetPrimAtPath(_physicsMaterialPath))
-    # bindingAPI.Bind(materialPrim, UsdShade.Tokens.weakerThanDescendants, "physics")
+
+
+    material = PhysicsMaterial(
+            prim_path=_physicsMaterialPath,
+            static_friction=1.0,
+            dynamic_friction=1.0,
+            restitution=0.0,
+        )
+        # -- enable patch-friction: yields better results!
+    physx_material_api = PhysxSchema.PhysxMaterialAPI.Apply(material.prim)
+    physx_material_api.CreateImprovePatchFrictionAttr().Set(True)
+    # -- bind material to feet
+    # for site_name in self.cfg.meta_info.tool_sites_names:
+    # kit_utils.apply_nested_physics_material(f"/World/Drawer/link_4", material.prim_path)
+    # prim = stage.GetPrimAtPath("/World/Drawer/link_4/collisions")
+    # collision_api = UsdPhysics.MeshCollisionAPI.Get(stage, prim.GetPath())
+    # if not collision_api:
+    #     collision_api = UsdPhysics.MeshCollisionAPI.Apply(prim)
+    
+    # collision_api.CreateApproximationAttr().Set("convexDecomposition")
+    meshCollision = PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(stage.GetPrimAtPath("/World/Drawer/link_4"))
+    meshCollision.CreateSdfResolutionAttr().Set(256)
+
+    # physicsUtils.add_physics_material_to_prim(self.stage, prim, _physicsMaterialPath)
 
 
 """
@@ -108,7 +128,7 @@ def main():
     """Spawns a mobile manipulator and applies random joint position commands."""
 
     # Load kit helper
-    sim = SimulationContext(physics_dt=0.01, rendering_dt=0.01, backend="torch")
+    sim = SimulationContext(physics_dt=1/600, rendering_dt=1/60, backend="torch")
     # Set main camera
     set_camera_view([1.5, 1.5, 1.5], [0.0, 0.0, 0.0])
     # Spawn things into stage
@@ -179,7 +199,10 @@ def main():
         # [0.5, -0.4, 0.6, -0.5, 0.5, -0.5, 0.5],
         [center1[0], center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, -1],
         [center1[0], center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
-        [center1[0]-0.01, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
+        [center1[0]-0.05, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
+        [center1[0]-0.10, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
+        [center1[0]-0.15, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
+        [center1[0]-0.20, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
     ]
     ee_goals = torch.tensor(ee_goals, device=sim.device)
     # Track the given command
