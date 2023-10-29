@@ -671,16 +671,16 @@ class DrawerRewardManager(RewardManager):
             # print('delta: ', tcp_to_obj_delta)
             tcp_to_obj_dist = tcp_to_obj_delta.norm()
             # print('tcp_to_obj_dist: ', tcp_to_obj_dist)
-            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < (handle_out_length/2 )
+            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < (handle_out_length * 0.6 )
             # short_ltip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum() 
             # short_rtip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum()
             # is_reached_short = (short_ltip * short_rtip) < 0
-            is_reached_short = (tcp_to_obj_delta * handle_short).sum().abs() < (handle_short_length/2)
-            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < (handle_long_length*2) 
+            is_reached_short = (tcp_to_obj_delta * handle_short).sum().abs() < (handle_short_length/3)
+            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < (handle_long_length) 
             is_reached = is_reached_out & is_reached_short & is_reached_long
 
-            if is_reached:
-                print('reached ')
+            # if is_reached:
+            #     print('reached ')
           
             # print('reached: ', is_reached_short, is_reached_long, is_reached_out)
             
@@ -771,9 +771,9 @@ class DrawerRewardManager(RewardManager):
            
 
             # print("reached: ",  is_reached_out, is_reached_short, is_reached_long, is_reached, gripper_open_percentage(env.robot.data.tool_dof_pos[idx].cpu()), close_reward)
-            grasp_success = is_reached & (rot_reward > -0.2) & (gripper_length < 0.07)
+            grasp_success = is_reached & (rot_reward > -0.2) & (gripper_length < 0.06)
             if grasp_success:
-                print(grasp_success)
+                print(grasp_success, gripper_length)
             # grasp_success = is_reached & (gripper_length < handle_short_length + 0.01) & (rot_reward > -0.2)
 
             # how much cabinets opened
@@ -784,7 +784,7 @@ class DrawerRewardManager(RewardManager):
             joint_state_reward =  ((pos - env.lower)/(env.upper-env.lower))
             # if joint_state_reward > 0.05:
             #     print('joint_state_reward: ', joint_state_reward)
-            reward =  reaching_reward + 0.5*rot_reward + 10*close_reward + grasp_success * 10*joint_state_reward 
+            reward =  reaching_reward + 0.5*rot_reward + 10*close_reward + 10 * grasp_success *(0.1 + joint_state_reward)
             if joint_state_reward > 0.9:
                 reward += 50
             rewards[idx] = reward

@@ -195,9 +195,9 @@ def main():
         # [0.2, 0.2, 1.4, 0.7071068,  0.0, 0.7071068, 0.0]
         # [0.5, -0.4, 0.6, -0.5, 0.5, -0.5, 0.5],
         # [center1[0]-0.10, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, -1],
-        [center1[0]-0.02, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, -1],
+        [center1[0], center1[1]+0.05, center1[2], 0.7071068, 0.0, 0.7071068, 0.0, -1],
         [center1[0]-0.02, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
-        [center1[0]-0.20, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
+        # [center1[0]-0.20, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
         # [center1[0]-0.10, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
         # [center1[0]-0.15, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
         # [center1[0]-0.20, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
@@ -213,7 +213,8 @@ def main():
     count = 0
     
     robot.update_buffers(sim_dt)
-
+    sim.step(render=not args_cli.headless)
+    robot.update_buffers(sim_dt)
     while simulation_app.is_running():
         # If simulation is stopped, then exit.
         if sim.is_stopped():
@@ -265,18 +266,82 @@ def main():
             handle_mid_point = (max_pt + min_pt) / 2
 
             # Note: We need to update buffers before the first step for the controller.
-            tool_positions = robot.data.ee_state_w[:, :3]
+            tool_positions = robot.data.ee_state_w[:, :3][0]
             tcp_to_obj_delta = tool_positions[:3] - handle_mid_point
             # print('delta: ', tcp_to_obj_delta)
             tcp_to_obj_dist = tcp_to_obj_delta.norm()
             # print('tcp_to_obj_dist: ', tcp_to_obj_dist)
-            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < (handle_out_length/2 )
+            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < (handle_out_length * 0.6)
             # short_ltip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum() 
             # short_rtip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum()
             # is_reached_short = (short_ltip * short_rtip) < 0
-            is_reached_short = (tcp_to_obj_delta * handle_short).sum().abs() < (handle_short_length/2)
-            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < (handle_long_length*2) 
+            is_reached_short = (tcp_to_obj_delta * handle_short).sum().abs() < (handle_short_length/3)
+            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < (handle_long_length) 
             is_reached = is_reached_out & is_reached_short & is_reached_long
+
+            def gripper_open_percentage(A, epsilon=1e-7):
+                    """
+                    Computes the gripper open percentage.
+                    
+                    X: Current state tensor.
+                    O: Open state tensor.
+                    C: Close state tensor.
+                    epsilon: A small value to check for negligible differences.
+                    
+                    Returns:
+                    Percentage of gripper open state.
+                    """
+                    X = A.clone()
+                    # O = torch.tensor([[-1.2278e-07, -2.2230e-07, 1.8682e-07, 1.2820e-07, -8.7570e-01, 8.7570e-01]])
+                    # C = torch.tensor([[7.2500e-01, 8.7570e-01, -8.7570e-01, -8.7570e-01, 6.9399e-08, -7.0420e-08]])
+
+                    O = 8.7570e-01#torch.tensor([[-1.2278e-07, -2.2230e-07, 1.8682e-07]])
+                    C = 0#torch.tensor([[7.2500e-01, 8.7570e-01, -8.7570e-01]])
+                    
+                    
+                    # Clip values in X to be within [C, O]
+                    # X = torch.where(X > O, O, X)
+                    # X = torch.where(X < C, C, X)
+                    
+                    
+                    X = X[-1]
+                    if X < 0:
+                        X = 0
+                    elif X > 0.8757:
+                        X = 0.8757
+                    
+                    # Compute the normalized differences
+                    diffs = (X - C) / (O - C + epsilon)
+                    
+                    # Check for non-negligible differences between O and C
+                    # mask = torch.abs(O - C) > epsilon
+                    
+                    # Calculate average percentage open for the significant elements
+                    percentage1 = diffs * 100
+
+                    O = 0 
+                    C = 8.7570e-01
+                    X = A.clone()
+                    X = X[1]
+                    if X < 0:
+                        X = 0
+                    elif X > 0.8757:
+                        X = 0.8757
+                    
+                    diffs = (X - C) / (O - C + epsilon)
+                    percentage2 = diffs * 100
+
+                    percentage = (percentage1 + percentage2)
+
+                    
+                    # Ensure the result is between 0 and 100
+                    percentage = max(0, min(100, percentage))
+                    
+                    return percentage/100.0
+
+            # import pdb; pdb.set_trace()
+            gripper_length =  0.08 * gripper_open_percentage(robot.data.tool_dof_pos[0].cpu())
+            print('gripper_length: ', gripper_length)
             print('handle_out: ', handle_out)
             print('handle_long: ', handle_long)
             print('handle_short: ', handle_short)
