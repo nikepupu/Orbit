@@ -93,8 +93,6 @@ def design_scene():
     # material.CreateDynamicFrictionAttr().Set(1.0)
     # material.CreateRestitutionAttr().Set(1.0)
 
-
-
     material = PhysicsMaterial(
             prim_path=_physicsMaterialPath,
             static_friction=1.0,
@@ -107,14 +105,14 @@ def design_scene():
     # -- bind material to feet
     # for site_name in self.cfg.meta_info.tool_sites_names:
     # kit_utils.apply_nested_physics_material(f"/World/Drawer/link_4", material.prim_path)
-    # prim = stage.GetPrimAtPath("/World/Drawer/link_4/collisions")
-    # collision_api = UsdPhysics.MeshCollisionAPI.Get(stage, prim.GetPath())
-    # if not collision_api:
-    #     collision_api = UsdPhysics.MeshCollisionAPI.Apply(prim)
+    prim = stage.GetPrimAtPath("/World/Drawer/link_4/collisions")
+    collision_api = UsdPhysics.MeshCollisionAPI.Get(stage, prim.GetPath())
+    if not collision_api:
+        collision_api = UsdPhysics.MeshCollisionAPI.Apply(prim)
     
-    # collision_api.CreateApproximationAttr().Set("convexDecomposition")
-    meshCollision = PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(stage.GetPrimAtPath("/World/Drawer/link_4"))
-    meshCollision.CreateSdfResolutionAttr().Set(256)
+    collision_api.CreateApproximationAttr().Set("convexDecomposition")
+    # meshCollision = PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(stage.GetPrimAtPath("/World/Drawer/link_4"))
+    # meshCollision.CreateSdfResolutionAttr().Set(256)
 
     # physicsUtils.add_physics_material_to_prim(self.stage, prim, _physicsMaterialPath)
 
@@ -128,7 +126,7 @@ def main():
     """Spawns a mobile manipulator and applies random joint position commands."""
 
     # Load kit helper
-    sim = SimulationContext(physics_dt=1/600, rendering_dt=1/60, backend="torch")
+    sim = SimulationContext(physics_dt=1/60, rendering_dt=1/60, backend="torch")
     # Set main camera
     set_camera_view([1.5, 1.5, 1.5], [0.0, 0.0, 0.0])
     # Spawn things into stage
@@ -183,9 +181,8 @@ def main():
     # Create buffers to store actions
     ik_commands = torch.zeros(robot.count, ik_controller.num_actions, device=robot.device)
     robot_actions = torch.ones(robot.count, robot.num_actions, device=robot.device) * -1
-
     link_path =  f"/World/Drawer/link_4"
-
+   
     min_box, max_box = omni.usd.get_context().compute_path_world_bounding_box(link_path)
             
     min_pt = torch.tensor(np.array(min_box))
@@ -197,23 +194,24 @@ def main():
     ee_goals = [
         # [0.2, 0.2, 1.4, 0.7071068,  0.0, 0.7071068, 0.0]
         # [0.5, -0.4, 0.6, -0.5, 0.5, -0.5, 0.5],
-        [center1[0], center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, -1],
-        [center1[0], center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
-        [center1[0]-0.05, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
-        [center1[0]-0.10, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
-        [center1[0]-0.15, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
+        # [center1[0]-0.10, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, -1],
+        [center1[0]-0.02, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, -1],
+        [center1[0]-0.02, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
         [center1[0]-0.20, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
+        # [center1[0]-0.10, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
+        # [center1[0]-0.15, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
+        # [center1[0]-0.20, center1[1], center1[2], 0.7071068, 0.0, 0.7071068, 0.0, 1],
     ]
     ee_goals = torch.tensor(ee_goals, device=sim.device)
-    # Track the given command
+     # Track the given command
     current_goal_idx = -1
 
-     # Define simulation stepping
+    # Define simulation stepping
     sim_dt = sim.get_physics_dt()
     # episode counter
     sim_time = 0.0
     count = 0
-    # Note: We need to update buffers before the first step for the controller.
+    
     robot.update_buffers(sim_dt)
 
     while simulation_app.is_running():
@@ -225,9 +223,72 @@ def main():
             sim.step(render=not args_cli.headless)
             continue
         # reset
+        def check():
+            link_path =  f"/World/Drawer/link_4"
+
+            min_box, max_box = omni.usd.get_context().compute_path_world_bounding_box(link_path)
+                    
+            min_pt = torch.tensor(np.array(min_box))
+            max_pt = torch.tensor(np.array(max_box))
+            
+            corners = torch.zeros((8, 3))
+            # Top right back
+            corners[0] = torch.tensor([max_pt[0], min_pt[1], max_pt[2]])
+            # Top right front
+            corners[1] = torch.tensor([min_pt[0], min_pt[1], max_pt[2]])
+            # Top left front
+            corners[2] = torch.tensor([min_pt[0], max_pt[1], max_pt[2]])
+            # Top left back (Maximum)
+            corners[3] = max_pt
+            # Bottom right back
+            corners[4] = torch.tensor([max_pt[0], min_pt[1], min_pt[2]])
+            # Bottom right front (Minimum)
+            corners[5] = min_pt
+            # Bottom left front
+            corners[6] = torch.tensor([min_pt[0], max_pt[1], min_pt[2]])
+            # Bottom left back
+            corners[7] = torch.tensor([max_pt[0], max_pt[1], min_pt[2]])
+
+            handle_short = corners[0] - corners[4]
+            handle_out = corners[1] - corners[0]
+            handle_long = corners[3] - corners[0]
+
+            handle_short, handle_long = handle_long, handle_short
+
+            handle_out_length = torch.norm(handle_out)
+            handle_long_length = torch.norm(handle_long)
+            handle_short_length = torch.norm(handle_short)
+            handle_out = handle_out / handle_out_length
+            handle_long = handle_long / handle_long_length
+            handle_short = handle_short / handle_short_length
+            
+            handle_mid_point = (max_pt + min_pt) / 2
+
+            # Note: We need to update buffers before the first step for the controller.
+            tool_positions = robot.data.ee_state_w[:, :3]
+            tcp_to_obj_delta = tool_positions[:3] - handle_mid_point
+            # print('delta: ', tcp_to_obj_delta)
+            tcp_to_obj_dist = tcp_to_obj_delta.norm()
+            # print('tcp_to_obj_dist: ', tcp_to_obj_dist)
+            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < (handle_out_length/2 )
+            # short_ltip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum() 
+            # short_rtip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum()
+            # is_reached_short = (short_ltip * short_rtip) < 0
+            is_reached_short = (tcp_to_obj_delta * handle_short).sum().abs() < (handle_short_length/2)
+            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < (handle_long_length*2) 
+            is_reached = is_reached_out & is_reached_short & is_reached_long
+            print('handle_out: ', handle_out)
+            print('handle_long: ', handle_long)
+            print('handle_short: ', handle_short)
+            print('handle_out_length: ', handle_out_length)
+            print('handle_long_length: ', handle_long_length)
+            print('handle_short_length: ', handle_short_length)
+            print(tcp_to_obj_delta, is_reached_out, is_reached_short, is_reached_long)
+            return is_reached
+        check()
         if current_goal_idx < len(ee_goals):
             
-            if count % 1000 == 0:
+            if count % 500 == 0:
                 if current_goal_idx + 1 < len(ee_goals):
                     current_goal_idx = current_goal_idx + 1
                 ik_commands[:] = ee_goals[current_goal_idx][:-1]
@@ -247,6 +308,8 @@ def main():
       
             
             robot.apply_action(robot_actions)
+        else:
+            exit()
             # perform step
         sim.step(render=not args_cli.headless)
             # update sim-time

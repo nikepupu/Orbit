@@ -158,7 +158,12 @@ class DrawerEnv(IsaacEnv):
         physicsUtils.add_physics_material_to_prim(self.stage, prim, _physicsMaterialPath)
         
 
+        prim = self.stage.GetPrimAtPath( self.template_env_ns + "/Drawer/link_4/collisions")
+        collision_api = UsdPhysics.MeshCollisionAPI.Get(self.stage, prim.GetPath())
+        if not collision_api:
+            collision_api = UsdPhysics.MeshCollisionAPI.Apply(prim)
         
+        collision_api.CreateApproximationAttr().Set("convexDecomposition")
         
 
         prim_path = self.template_env_ns + "/Drawer"
@@ -671,7 +676,7 @@ class DrawerRewardManager(RewardManager):
             # short_rtip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum()
             # is_reached_short = (short_ltip * short_rtip) < 0
             is_reached_short = (tcp_to_obj_delta * handle_short).sum().abs() < (handle_short_length/2)
-            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < (handle_long_length/2) 
+            is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < (handle_long_length*2) 
             is_reached = is_reached_out & is_reached_short & is_reached_long
 
             if is_reached:

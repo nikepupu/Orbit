@@ -76,7 +76,7 @@ KINOVA_CFG = SingleArmManipulatorCfg(
     ),
 
     ee_info=SingleArmManipulatorCfg.EndEffectorFrameCfg(
-        body_name="robotiq_85_base_link", pos_offset=(0.03, 0.0, 0.15), rot_offset=(1.0, 0.0, 0.0, 0.0)
+        body_name="robotiq_85_base_link", pos_offset=(0.03, 0.0, 0.139), rot_offset=(1.0, 0.0, 0.0, 0.0)
     ),
 
     # rigid_props=SingleArmManipulatorCfg.RigidBodyPropertiesCfg(
