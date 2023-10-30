@@ -134,11 +134,6 @@ class DrawerEnv(IsaacEnv):
         from omni.isaac.core.materials import PhysicsMaterial
         prim = self.stage.GetPrimAtPath(self.template_env_ns + "/Drawer")
         _physicsMaterialPath = prim.GetPath().AppendChild("physicsMaterial")
-        # UsdShade.Material.Define(self.stage, _physicsMaterialPath)
-        # material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
-        # material.CreateStaticFrictionAttr().Set(1.0)
-        # material.CreateDynamicFrictionAttr().Set(1.0)
-        # material.CreateRestitutionAttr().Set(1.0)
 
 
 
