@@ -41,7 +41,7 @@ def quat_axis(q, axis_idx):
 from typing import Optional
 
 from omni.isaac.core.articulations import ArticulationView
-from omni.isaac.core.prims import RigidPrimView, XFormPrim
+from omni.isaac.core.prims import RigidPrimView, XFormPrim, XFormPrimView
 
 class CabinetView(ArticulationView):
     def __init__(
@@ -134,11 +134,6 @@ class DrawerEnv(IsaacEnv):
         from omni.isaac.core.materials import PhysicsMaterial
         prim = self.stage.GetPrimAtPath(self.template_env_ns + "/Drawer")
         _physicsMaterialPath = prim.GetPath().AppendChild("physicsMaterial")
-        # UsdShade.Material.Define(self.stage, _physicsMaterialPath)
-        # material = UsdPhysics.MaterialAPI.Apply(self.stage.GetPrimAtPath(_physicsMaterialPath))
-        # material.CreateStaticFrictionAttr().Set(1.0)
-        # material.CreateDynamicFrictionAttr().Set(1.0)
-        # material.CreateRestitutionAttr().Set(1.0)
 
 
 
@@ -164,6 +159,9 @@ class DrawerEnv(IsaacEnv):
             collision_api = UsdPhysics.MeshCollisionAPI.Apply(prim)
         
         collision_api.CreateApproximationAttr().Set("convexDecomposition")
+
+        contactReportAPI = PhysxSchema.PhysxContactReportAPI.Apply(prim)
+        contactReportAPI.CreateThresholdAttr().Set(200000)
         
 
         prim_path = self.template_env_ns + "/Drawer"
@@ -185,6 +183,13 @@ class DrawerEnv(IsaacEnv):
 
         self.drawer_link_path =  "/link_4"
         self.drawer_joint_path = "/link_2/joint_1"
+
+        ltip_path = "/World/envs/env_.*/Robot/left_inner_finger/ltip"
+        rtip_path = "/World/envs/env_.*/Robot/right_inner_finger/rtip"
+        
+
+        # self.ltip = XFormPrimView(prim_paths_expr=ltip_path)
+        # self.rtip = XFormPrimView(prim_paths_expr=rtip_path)
         
 
         print('done design scene')
@@ -566,6 +571,10 @@ class DrawerRewardManager(RewardManager):
          # Calculate handle vectors
         # TODO need to check this
         
+        # ltip_pose = env.ltip.get_world_poses()
+        # rtip_pose = env.rtip.get_world_poses()
+
+        # print(ltip_pose, rtip_pose)
         import omni
         rewards = torch.zeros(env.num_envs)
         for idx in range(env.num_envs):
@@ -671,13 +680,13 @@ class DrawerRewardManager(RewardManager):
             # print('delta: ', tcp_to_obj_delta)
             tcp_to_obj_dist = tcp_to_obj_delta.norm()
             # print('tcp_to_obj_dist: ', tcp_to_obj_dist)
-            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < (handle_out_length * 0.6 )
+            is_reached_out = (tcp_to_obj_delta * handle_out).sum().abs() < (handle_out_length /2 )
             # short_ltip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum() 
             # short_rtip = ((tool_positions[:3] - handle_mid_point) * handle_short).sum()
             # is_reached_short = (short_ltip * short_rtip) < 0
             is_reached_short = (tcp_to_obj_delta * handle_short).sum().abs() < (handle_short_length/3)
             is_reached_long = (tcp_to_obj_delta * handle_long).sum().abs() < (handle_long_length) 
-            is_reached = is_reached_out & is_reached_short & is_reached_long
+            is_reached = is_reached_out & is_reached_short & is_reached_long & (tcp_to_obj_dist < 0.03)
 
             # if is_reached:
             #     print('reached ')
@@ -715,6 +724,15 @@ class DrawerRewardManager(RewardManager):
                 print("handle_short: ", handle_short)
                 print("hand_down_dir: ", hand_down_dir)
                 print("handle_long: ", handle_long)
+            #/World/envs/env_0/Robot/right_inner_finger/rtip
+            
+            # ltip_pos = omni.usd.get_context().get_stage().GetPrimAtPath(ltip_path).GetAttribute("xformOp:translate").Get()
+            # rtip_pos = omni.usd.get_context().get_stage().GetPrimAtPath(rtip_path).GetAttribute("xformOp:translate").Get()
+            # ltip_pos = torch.tensor(ltip_pos) - env.envs_positions[idx].cpu()
+            # rtip_pos = torch.tensor(rtip_pos) - env.envs_positions[idx].cpu()
+            # print('ltip_pos: ', ltip_pos)
+            # print('rtip_pos: ', rtip_pos)
+
             
             def gripper_open_percentage(X, epsilon=1e-7):
                     """
@@ -766,14 +784,14 @@ class DrawerRewardManager(RewardManager):
 
             # close_reward = (0.1 - gripper_length) * is_reached + (gripper_length) * (~is_reached)
 
-            close_reward = (0.05 - gripper_length) * is_reached + (gripper_length-0.1) * (~is_reached)
+            close_reward = (0.1 - gripper_length) * is_reached + (gripper_length-0.1) * (~is_reached)
 
            
 
             # print("reached: ",  is_reached_out, is_reached_short, is_reached_long, is_reached, gripper_open_percentage(env.robot.data.tool_dof_pos[idx].cpu()), close_reward)
-            grasp_success = is_reached & (rot_reward > -0.2) & (gripper_length < 0.06)
+            grasp_success = is_reached & (rot_reward > -0.15) & (gripper_length < 0.06) & (tcp_to_obj_dist < 0.03)
             if grasp_success:
-                print(grasp_success, gripper_length)
+                print(grasp_success, gripper_length, tcp_to_obj_dist)
             # grasp_success = is_reached & (gripper_length < handle_short_length + 0.01) & (rot_reward > -0.2)
 
             # how much cabinets opened
@@ -784,9 +802,10 @@ class DrawerRewardManager(RewardManager):
             joint_state_reward =  ((pos - env.lower)/(env.upper-env.lower))
             # if joint_state_reward > 0.05:
             #     print('joint_state_reward: ', joint_state_reward)
-            reward =  reaching_reward + 0.5*rot_reward + 10*close_reward + 10 * grasp_success *(0.1 + joint_state_reward)
-            if joint_state_reward > 0.9 and grasp_success:
-                reward += 50
+            reward =  reaching_reward + 0.5*rot_reward + 5*close_reward + 5 * grasp_success *(0.1 + joint_state_reward)
+            #reward += abs(reward)* rot_reward
+            # if joint_state_reward and grasp_success > 0.9:
+            #     reward += 50
             rewards[idx] = reward
 
         # self._goal_markers.set_world_poses(env.ee_des_pose_w[:, :3], env.ee_des_pose_w[:, 3:7])

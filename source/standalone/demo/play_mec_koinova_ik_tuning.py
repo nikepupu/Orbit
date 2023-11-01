@@ -53,11 +53,37 @@ from omni.isaac.orbit.controllers.differential_inverse_kinematics import (
 )
 from omni.isaac.orbit.markers import StaticMarker
 from omni.physx.scripts import physicsUtils
-
+from omni.isaac.core.prims import XFormPrim
+from omni.physx import get_physx_interface, get_physx_simulation_interface
+from pxr import Usd, UsdLux, UsdGeom, UsdShade, Sdf, Gf, Tf, Vt, UsdPhysics, PhysxSchema
+from omni.physx.scripts.physicsUtils import *
 """
 Helpers
 """
-
+def _on_physics_step():
+    contact_headers, contact_data = get_physx_simulation_interface().get_contact_report()
+    for contact_header in contact_headers:
+        print("Got contact header type: " + str(contact_header.type))
+        print("Actor0: " + str(PhysicsSchemaTools.intToSdfPath(contact_header.actor0)))
+        print("Actor1: " + str(PhysicsSchemaTools.intToSdfPath(contact_header.actor1)))
+        print("Collider0: " + str(PhysicsSchemaTools.intToSdfPath(contact_header.collider0)))
+        print("Collider1: " + str(PhysicsSchemaTools.intToSdfPath(contact_header.collider1)))
+        print("StageId: " + str(contact_header.stage_id))
+        print("Number of contacts: " + str(contact_header.num_contact_data))
+        
+        contact_data_offset = contact_header.contact_data_offset
+        num_contact_data = contact_header.num_contact_data
+        
+        for index in range(contact_data_offset, contact_data_offset + num_contact_data, 1):
+            print("Contact:")
+            print("Contact position: " + str(contact_data[index].position))
+            print("Contact normal: " + str(contact_data[index].normal))
+            print("Contact impulse: " + str(contact_data[index].impulse))
+            print("Contact separation: " + str(contact_data[index].separation))
+            print("Contact faceIndex0: " + str(contact_data[index].face_index0))
+            print("Contact faceIndex1: " + str(contact_data[index].face_index1))
+            print("Contact material0: " + str(PhysicsSchemaTools.intToSdfPath(contact_data[index].material0)))
+            print("Contact material1: " + str(PhysicsSchemaTools.intToSdfPath(contact_data[index].material1)))
 
 def design_scene():
     """Add prims to the scene."""
@@ -111,6 +137,13 @@ def design_scene():
         collision_api = UsdPhysics.MeshCollisionAPI.Apply(prim)
     
     collision_api.CreateApproximationAttr().Set("convexDecomposition")
+
+    contactReportAPI = PhysxSchema.PhysxContactReportAPI.Apply(prim)
+    contactReportAPI.CreateThresholdAttr().Set(200000)
+
+    _stepping_sub = get_physx_interface().subscribe_physics_step_events(_on_physics_step)
+
+    
     # meshCollision = PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(stage.GetPrimAtPath("/World/Drawer/link_4"))
     # meshCollision.CreateSdfResolutionAttr().Set(256)
 
@@ -215,6 +248,8 @@ def main():
     robot.update_buffers(sim_dt)
     sim.step(render=not args_cli.headless)
     robot.update_buffers(sim_dt)
+
+    stage = omni.usd.get_context().get_stage()
     while simulation_app.is_running():
         # If simulation is stopped, then exit.
         if sim.is_stopped():
@@ -341,16 +376,45 @@ def main():
 
             # import pdb; pdb.set_trace()
             gripper_length =  0.08 * gripper_open_percentage(robot.data.tool_dof_pos[0].cpu())
-            print('gripper_length: ', gripper_length)
-            print('handle_out: ', handle_out)
-            print('handle_long: ', handle_long)
-            print('handle_short: ', handle_short)
-            print('handle_out_length: ', handle_out_length)
-            print('handle_long_length: ', handle_long_length)
-            print('handle_short_length: ', handle_short_length)
-            print(tcp_to_obj_delta, is_reached_out, is_reached_short, is_reached_long)
+            # print('gripper_length: ', gripper_length)
+            # print('handle_out: ', handle_out)
+            # print('handle_long: ', handle_long)
+            # print('handle_short: ', handle_short)
+            # print('handle_out_length: ', handle_out_length)
+            # print('handle_long_length: ', handle_long_length)
+            # print('handle_short_length: ', handle_short_length)
+            # print(tcp_to_obj_delta, is_reached_out, is_reached_short, is_reached_long)
             return is_reached
         check()
+        # prim = stage.GetPrimAtPath("/World/envs/env_.*/Robot/right_inner_finger")
+        # prim = XFormPrim("/World/envs/env_0/Robot/left_inner_finger")
+        # print( 'left finger position: ', prim.get_world_pose())
+        # prim = XFormPrim("/World/envs/env_0/Robot/right_inner_finger")
+        # print( 'right finger position: ', prim.get_world_pose())
+
+        contact_headers, contact_data = get_physx_simulation_interface().get_contact_report()
+        for contact_header in contact_headers:
+            print("Got contact header type: " + str(contact_header.type))
+            print("Actor0: " + str(PhysicsSchemaTools.intToSdfPath(contact_header.actor0)))
+            print("Actor1: " + str(PhysicsSchemaTools.intToSdfPath(contact_header.actor1)))
+            print("Collider0: " + str(PhysicsSchemaTools.intToSdfPath(contact_header.collider0)))
+            print("Collider1: " + str(PhysicsSchemaTools.intToSdfPath(contact_header.collider1)))
+            print("StageId: " + str(contact_header.stage_id))
+            print("Number of contacts: " + str(contact_header.num_contact_data))
+            
+            contact_data_offset = contact_header.contact_data_offset
+            num_contact_data = contact_header.num_contact_data
+            
+            for index in range(contact_data_offset, contact_data_offset + num_contact_data, 1):
+                print("Contact:")
+                print("Contact position: " + str(contact_data[index].position))
+                print("Contact normal: " + str(contact_data[index].normal))
+                print("Contact impulse: " + str(contact_data[index].impulse))
+                print("Contact separation: " + str(contact_data[index].separation))
+                print("Contact faceIndex0: " + str(contact_data[index].face_index0))
+                print("Contact faceIndex1: " + str(contact_data[index].face_index1))
+                print("Contact material0: " + str(PhysicsSchemaTools.intToSdfPath(contact_data[index].material0)))
+                print("Contact material1: " + str(PhysicsSchemaTools.intToSdfPath(contact_data[index].material1)))
         if current_goal_idx < len(ee_goals):
             
             if count % 500 == 0:
