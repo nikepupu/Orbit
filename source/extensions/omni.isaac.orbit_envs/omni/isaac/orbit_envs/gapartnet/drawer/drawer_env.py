@@ -785,7 +785,7 @@ class DrawerRewardManager(RewardManager):
             # if joint_state_reward > 0.05:
             #     print('joint_state_reward: ', joint_state_reward)
             reward =  reaching_reward + 0.5*rot_reward + 10*close_reward + 10 * grasp_success *(0.1 + joint_state_reward)
-            if joint_state_reward > 0.9:
+            if joint_state_reward > 0.9 and grasp_success:
                 reward += 50
             rewards[idx] = reward
 
